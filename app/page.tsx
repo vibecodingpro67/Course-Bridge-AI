@@ -1,8 +1,13 @@
 "use client";
 
 import { ReactNode, useMemo, useState } from "react";
-
 type Priority = "High" | "Medium" | "Low";
+
+<img
+  src="/coursebridge-logo.png"
+  alt="CourseBridge logo"
+  className="h-16 w-auto"
+/>
 
 type CourseRequirement = {
   code: string;
@@ -863,11 +868,14 @@ export default function Home() {
     <main className="min-h-screen bg-[#eee9df] text-[#2f3135]">
       <section className="mx-auto max-w-7xl px-5 py-6 md:px-8">
         <nav className="mb-12 flex items-center justify-between border-b border-[#d8d0c3] pb-5">
-          <div>
-            <p className="text-lg font-bold tracking-tight text-[#2f3135]">
-              CourseBridge
-            </p>
-            <p className="text-sm text-[#7b818b]">
+          <div className="flex items-center gap-5">
+            <img
+              src="/coursebridge-logo.png"
+              alt="CourseBridge logo"
+              className="h-60 w-auto mix-blend-multiply"
+            />
+
+            <p className="text-xl text-[#7b818b]">
               Transfer planning for community college students
             </p>
           </div>
