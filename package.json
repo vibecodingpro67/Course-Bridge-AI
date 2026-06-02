@@ -1,5 +1,6 @@
 {
   "scripts": {
+    "test-course-aliases": "node scripts/course_interpreter_alias_test.js",
     "test-spellcheck": "node scripts/test_spellcheck.js",
     "dev": "next dev",
     "build": "next build",

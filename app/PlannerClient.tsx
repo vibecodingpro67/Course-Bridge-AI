@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import { interpretCompletedCourses } from "../lib/courseInterpreter.js";
 
 const commonCompletedCourseAliases: Record<string, string[]> = {
+  // Keep this client-side fallback in sync with lib/courseInterpreter.js.
   "MATH 110A": ["calc 1", "calculus 1", "calculus one"],
   "MATH 110B": ["calc 2", "calculus 2", "calculus two"],
   "ECON 1": ["intro micro", "microeconomics", "econ 1"],
