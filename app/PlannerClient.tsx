@@ -1090,12 +1090,14 @@ export default function PlannerClient() {
   async function generateAIPlan(college: string, school: string, major: string, courses: string) {
     setAiPlanLoading(true);
     setAiPlan("");
-    const coursePart = courses.trim()
-      ? `I've completed these courses: ${courses}.`
-      : "I haven't completed any courses yet.";
-    const message = `I attend ${college} and want to transfer to ${school} for ${major}. ${coursePart} What courses from ${college} satisfy ${school}'s ${major} major requirements? What are the specific articulation agreements, TAG eligibility, IGETC requirements, and what should I prioritize taking next?`;
+    const coursePart = courses.trim() ? `Completed so far: ${courses}.` : "No courses completed yet.";
+    const message = `I'm at ${college} transferring to ${school} for ${major}. ${coursePart} Give me: (1) which ${college} courses satisfy ${school} ${major} requirements with exact articulation, (2) a semester-by-semester 2-year schedule, (3) TAG eligibility, (4) IGETC notes. Be specific and accurate — only state articulations you have data for.`;
     try {
-      await streamResponse("/api/chat", [{ role: "user", content: message }], (r) => setAiPlan(r));
+      await streamResponse("/api/chat", [{ role: "user", content: message }], (r) => {
+        // Strip the model-switch notice from the displayed output
+        const cleaned = r.replace(/\[Note: switching to faster model[^\]]*\]/g, "").trimStart();
+        setAiPlan(cleaned);
+      });
     } catch {
       setAiPlan("Something went wrong generating your plan. Try asking the AI chat directly.");
     } finally {
@@ -1134,9 +1136,9 @@ export default function PlannerClient() {
     try {
       setChatMessages([...newHistory, { role: "assistant", content: "" }]);
       const reply = await streamResponse("/api/chat", newHistory.map(m => ({ ...m, content: m.content })), (r) => {
-        setChatMessages([...newHistory, { role: "assistant", content: r }]);
+        setChatMessages([...newHistory, { role: "assistant", content: r.replace(/\[Note: switching to faster model[^\]]*\]/g, "").trimStart() }]);
       });
-      setChatMessages([...newHistory, { role: "assistant", content: reply }]);
+      setChatMessages([...newHistory, { role: "assistant", content: reply.replace(/\[Note: switching to faster model[^\]]*\]/g, "").trimStart() }]);
     } catch {
       setChatMessages([...newHistory, { role: "assistant", content: "Something went wrong. Please try again." }]);
     } finally {
