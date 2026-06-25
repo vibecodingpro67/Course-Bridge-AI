@@ -477,49 +477,74 @@ def plan():
     uc_l_for_gpa = _UC_NAME_MAP.get(school.lower().strip(), school.lower())
     gpa_range, gpa_note = _UC_GPA_TARGETS.get(uc_l_for_gpa, ("3.5+", f"Target 3.5+ for {school}."))
 
-    prompt = f"""Build a complete 4-term transfer schedule for a student at {college} transferring to {school} for {major}.
+    prompt = f"""You are building a complete 4-term UC transfer schedule for a student at {college} transferring to {school} for {major}.
 
 {articulation_section}{igetc_section}
 
 Already completed — EXCLUDE ENTIRELY: {completed_str}
 {ap_section}
 
-RULES (every rule is mandatory):{honors_rule}
-1. MAJOR PREP: Include EVERY course from the articulation list. These are non-negotiable requirements. Do not skip any.
-2. IGETC: The schedule must cover all required IGETC areas (1A, 1B, 2A, 3A, 3B, 4, 5A or 5B, 6). Use only courses from the IGETC list above for these slots.
-3. PREREQUISITES — HARD RULE: A course may only appear in Term N if every one of its prerequisites appears in an earlier term OR is already completed/covered by AP credit.{fresh_start_rule}
-   - English sequence: Area 1A (first-year composition) → Area 1B (critical thinking/analysis). NEVER place 1B before 1A.
-   - Math sequence: Calculus I → Calculus II → Calculus III. Never skip a step.
-   - Any course titled "Advanced", "Intermediate", or numbered above 100 that has a lower-level prerequisite must be placed AFTER that prerequisite.
-4. ENGLISH COURSES — HARD RULE: For Area 1A, select a standard first-year English Composition course (e.g. English 1A, ENGL 100, ENGL C1000). NEVER use an ESL course (any course with prefix ESL, ENG/ESL, or title containing "English as a Second Language") — these are only for non-native speakers and must never appear in a transfer plan unless the student specifically requests ESL courses.
-5. COURSE TITLES: Use exact course numbers and titles from the data above. No invented courses.
-6. CC ONLY: Every course must be from {college}. Never list {school} course numbers.
-7. COMPLETED: Never include any course already listed under "Already completed" or covered by AP credit.
-8. LOAD: Each term MUST have 12–16 units minimum and 3–5 courses. Any term below 12 units is invalid — rebuild it by adding another required or IGETC course.
-9. IGETC NOTE: A course that satisfies major prep may also count toward IGETC (e.g., ECON courses count for Area 4). Do not double-count — list it once.
-10. NO DUPLICATES: Never include both a regular course and its honors variant (e.g., if ECON 1 is in the plan, do NOT also add ECON 1H). Pick one version only.
-11. AP CREDIT: Any course area covered by AP credit does not need to be retaken — skip it and fill that slot with the next needed course.
-12. NO PREAMBLE: Start directly with ## Term 1 (Fall).
+===== STEP 1: ASSEMBLE YOUR REQUIRED COURSE POOL =====
+Before writing any terms, you must identify every course that will appear in the schedule:
 
-Output format:
+A) MAJOR PREP — list every course from the articulation data above. These are mandatory.
+
+B) IGETC — pick exactly ONE course per required area from the IGETC list above:
+   - Area 1A: one first-year English Composition course (NOT ESL)
+   - Area 1B: one Critical Thinking course (must come AFTER Area 1A)
+   - Area 2A: one Math course (Calculus counts if listed)
+   - Area 3A: one Arts course
+   - Area 3B: one Humanities course
+   - Area 4: three Social/Behavioral Science courses (ECON 1 and ECON 2 count here)
+   - Area 5A: one Physical Science course
+   - Area 5B: one Biological Science course
+   - Area 6: one foreign language course, OR note HS proficiency fallback
+{'' if accept_honors else '   DO NOT pick any course whose number ends in H (e.g. ECON 1H) — use non-honors only.'}
+If a major prep course satisfies an IGETC area, count it for both — do NOT add a separate IGETC course for that area.
+Every course in the pool must appear exactly once in the final schedule.
+
+===== STEP 2: DISTRIBUTE ACROSS 4 TERMS =====
+Rules:{honors_rule}
+- Each term: 12–16 units, 3–5 courses. Any term under 12 units is INVALID.
+- Prerequisites: Area 1A before 1B. Calculus I → II → III. No course before its prereq.
+- No ESL courses (prefix ESL or title containing "English as a Second Language").
+- No invented course numbers — use only exact courses from the data above.
+- No {school} course numbers — only {college} courses.
+- No already-completed courses.
+- Each course appears exactly ONCE across all 4 terms.
+
+===== STEP 3: OUTPUT =====
+Start directly with ## Term 1 (Fall). No preamble.
+
 ## Term 1 (Fall)
-- COURSE# — Official Title ({college}) (X units)
+- COURSE# — Official Title (X units) [Area Xn / Major Prep if applicable]
 
 ## Term 2 (Spring)
-- COURSE# — Official Title ({college}) (X units)
+- COURSE# — Official Title (X units) [Area Xn]
 
 ## Term 3 (Fall)
-- COURSE# — Official Title ({college}) (X units)
+- COURSE# — Official Title (X units) [Area Xn]
 
 ## Term 4 (Spring)
-- COURSE# — Official Title ({college}) (X units)
+- COURSE# — Official Title (X units) [Area Xn]
 
 ## Major Prep Summary
-- [List each UC requirement and which {college} course covers it]
+- [Each UC requirement → which {college} course fulfills it]
+
+## IGETC Completion
+(ONLY check ✅ if that course appears in the schedule above)
+- Area 1A: ✅/❌ COURSE#
+- Area 1B: ✅/❌ COURSE#
+- Area 2A: ✅/❌ COURSE#
+- Area 3A: ✅/❌ COURSE#
+- Area 3B: ✅/❌ COURSE#
+- Area 4: ✅/❌ COURSE#, COURSE#, COURSE#
+- Area 5A: ✅/❌ COURSE#
+- Area 5B: ✅/❌ COURSE#
+- Area 6: ✅/❌ COURSE# or ⚠️ satisfy with 2+ years HS foreign language
 
 ## Key Notes
 - TAG: [eligible/not and why]
-- IGETC: [complete/partial]
 - GPA target: {gpa_range} — {gpa_note}"""
 
     def generate():
