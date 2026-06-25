@@ -163,6 +163,210 @@ def reset():
     return ("", 204)
 
 
+# ── Plan generation ────────────────────────────────────────────────────────
+
+def _extract_major_prep(college: str, uc: str, major: str) -> str:
+    """
+    Find the agreement file for college→uc+major, extract the exact CC courses
+    required, and return a structured string the LLM must follow verbatim.
+    """
+    from search_agreements import _INDEX, _parse_agreement, _sim
+    import os
+
+    if not _INDEX:
+        return ""
+
+    college_l = college.lower()
+    uc_l      = uc.lower()
+    major_l   = major.lower()
+
+    # Score every agreement file
+    best_score, best_entry = 0, None
+    for entry in _INDEX:
+        cc_words  = [w for w in entry["cc"].lower().split()  if len(w) >= 3]
+        uc_words  = [w for w in entry["uc"].lower().split()  if len(w) >= 3]
+        maj_words = [w for w in entry["major"].lower().split() if len(w) >= 4]
+
+        cc_hit  = sum(1 for w in cc_words  if w in college_l) / max(len(cc_words), 1)
+        uc_hit  = sum(1 for w in uc_words  if w in uc_l)      / max(len(uc_words), 1)
+        maj_hit = sum(1 for w in maj_words if w in major_l)   / max(len(maj_words), 1)
+
+        score = cc_hit * 3 + uc_hit * 3 + maj_hit * 4
+        if score > best_score:
+            best_score  = score
+            best_entry  = entry
+
+    if not best_entry or best_score < 2.0:
+        return ""
+
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "agreements", best_entry["fname"])
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return ""
+
+    result = data.get("result", {})
+    arts_raw = result.get("articulations", "[]")
+    arts = json.loads(arts_raw) if isinstance(arts_raw, str) else (arts_raw or [])
+
+    lines = [
+        f"=== VERIFIED ARTICULATION DATA: {college} → {best_entry['uc']} | {best_entry['major']} ===",
+        f"Source: ASSIST.org agreement (authoritative — do not deviate from this list)",
+        "",
+        "The student MUST complete the following courses at their community college.",
+        "Use ONLY these course numbers and titles. Do not substitute or add unlisted courses.",
+        "",
+    ]
+
+    has_data = False
+    for art in arts:
+        if not isinstance(art, dict):
+            continue
+        inner   = art.get("articulation", {})
+        uc_c    = inner.get("course", {})
+        sa      = inner.get("sendingArticulation", {})
+        reason  = sa.get("noArticulationReason", "")
+        items   = sa.get("items", [])
+
+        uc_str = (f"{uc_c.get('prefix','')} {uc_c.get('courseNumber','')} "
+                  f"— {uc_c.get('courseTitle','')}")
+
+        if reason:
+            lines.append(f"• {uc_str}: No CC equivalent (cannot be satisfied at CC)")
+        else:
+            cc_options = []
+            for grp in items:
+                if not isinstance(grp, dict):
+                    continue
+                conj = grp.get("courseConjunction", "Or")
+                grp_courses = []
+                for c in grp.get("items", []):
+                    if isinstance(c, dict) and c.get("courseNumber"):
+                        title = c.get("courseTitle", "")
+                        num   = c.get("courseNumber", "")
+                        pfx   = c.get("prefix", "")
+                        units = c.get("maxUnits", "?")
+                        grp_courses.append(f"{pfx} {num} — {title} ({units} units)")
+                if grp_courses:
+                    cc_options.append(f" {conj} ".join(grp_courses))
+
+            if cc_options:
+                has_data = True
+                lines.append(f"• UC requires: {uc_str}")
+                for opt in cc_options:
+                    lines.append(f"  → Enroll in: {opt}")
+            else:
+                lines.append(f"• {uc_str}: No direct articulation found")
+
+    if not has_data:
+        return ""
+
+    lines.append("")
+    lines.append("=== END ARTICULATION DATA ===")
+    return "\n".join(lines)
+
+
+@app.route("/plan", methods=["POST"])
+def plan():
+    ip = _get_ip()
+    if not _check_rate(ip):
+        def rate_msg():
+            yield f"data: {json.dumps('Rate limit reached. Please wait a moment.')}\n\n"
+            yield "data: [DONE]\n\n"
+        return Response(stream_with_context(rate_msg()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache"})
+
+    data      = request.json or {}
+    college   = data.get("college", "").strip()
+    school    = data.get("school", "").strip()
+    major     = data.get("major", "").strip()
+    completed = data.get("completedCourses", "").strip()
+
+    if not college or not school or not major:
+        def err():
+            yield f"data: {json.dumps('Missing college, school, or major.')}\n\n"
+            yield "data: [DONE]\n\n"
+        return Response(stream_with_context(err()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache"})
+
+    # Pre-extract the exact courses from the ASSIST agreement file
+    major_prep_block = _extract_major_prep(college, school, major)
+    completed_str    = completed if completed else "none"
+
+    if major_prep_block:
+        data_section = major_prep_block
+    else:
+        data_section = (f"No exact agreement file found for {college} → {school} {major}. "
+                        f"Use your ASSIST knowledge to suggest likely articulation courses, "
+                        f"and mark each as '(verify on ASSIST.org)'.")
+
+    prompt = f"""Build a 4-term semester schedule for a student at {college} transferring to {school} for {major}.
+
+{data_section}
+
+Already completed — EXCLUDE ENTIRELY from schedule: {completed_str}
+
+RULES (any violation is an error):
+1. MAJOR PREP FIRST: Schedule all courses from the articulation list above. These are required. Do not omit them.
+2. PREREQUISITES: Never put a course and its prerequisite in the same term. Sequence them across terms.
+3. COURSE TITLES: Use the exact course number and title from the articulation data above. No substitutions.
+4. CC ONLY: Every course must be taken at {college}. Never list {school} course numbers.
+5. COMPLETED: Do not include any already-completed course anywhere in the schedule.
+6. LOAD: 4–5 courses per term, 13–17 units max.
+7. FILL: After placing all major prep courses, fill remaining slots with IGETC/GE courses from {college}.
+8. NO PREAMBLE: Begin your response directly with ## Term 1 (Fall).
+
+Output format:
+## Term 1 (Fall)
+- COURSE# — Official Title ({college}) (X units)
+
+## Term 2 (Spring)
+- COURSE# — Official Title ({college}) (X units)
+
+## Term 3 (Fall)
+- COURSE# — Official Title ({college}) (X units)
+
+## Term 4 (Spring)
+- COURSE# — Official Title ({college}) (X units)
+
+## Major Prep Summary
+- [List each UC requirement and which {college} course covers it]
+
+## Key Notes
+- TAG: [eligible/not and why]
+- IGETC: [complete/partial]
+- GPA target: [number]"""
+
+    history = [{"role": "user", "content": prompt}]
+
+    uid          = session.get("user_id")
+    user_profile = get_user_by_id(uid) if uid else None
+
+    def generate():
+        try:
+            for chunk in ask_advisor_stream(history, user_profile=user_profile):
+                yield f"data: {json.dumps(chunk)}\n\n"
+        except Exception as e:
+            err_str = str(e).lower()
+            if any(kw in err_str for kw in ["rate_limit", "429", "quota", "tokens per"]):
+                try:
+                    for chunk in ask_advisor_stream_fallback(history, user_profile=user_profile):
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                except Exception:
+                    yield f"data: {json.dumps('Something went wrong. Please try again.')}\n\n"
+            else:
+                yield f"data: {json.dumps('Something went wrong. Please try again.')}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.route("/onboard", methods=["POST"])
 def onboard():
     data    = request.json or {}
