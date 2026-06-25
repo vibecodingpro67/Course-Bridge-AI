@@ -472,6 +472,9 @@ def plan():
     accept_honors = data.get("acceptHonors", True)
     ap_credits    = data.get("apCredits", "").strip()
     hs_math       = data.get("hsMath", "").strip()
+    mode          = data.get("mode", "competitive").lower().strip()
+    if mode not in ("competitive", "efficiency"):
+        mode = "competitive"
 
     if not college or not school or not major:
         def err():
@@ -515,7 +518,26 @@ def plan():
     uc_l_for_gpa = _UC_NAME_MAP.get(school.lower().strip(), school.lower())
     gpa_range, gpa_note = _UC_GPA_TARGETS.get(uc_l_for_gpa, ("3.5+", f"Target 3.5+ for {school}."))
 
-    prompt = f"""You are building a complete 4-term UC transfer schedule for a student at {college} transferring to {school} for {major}.
+    if mode == "efficiency":
+        mode_block = """\n=== PLANNING MODE: EFFICIENCY ===
+The student wants the LOWEST WORKLOAD path that still satisfies all transfer requirements.
+- For each IGETC slot, pick the course with the least reading, writing, and exam difficulty.
+- Prefer arts, humanities, and social science GE over lab sciences when both are available.
+- Do NOT include Statistics, Calculus III, or Linear Algebra — they are not required and add difficulty.
+- Still complete all required major prep (Microeconomics, Macroeconomics, Calculus I, Calculus II).
+- Do NOT add any Tier 2 strongly recommended courses — efficiency mode skips them intentionally.
+- Label every GE course as [IGETC Area Xn — Efficiency Pick].
+- Strength score will be lower; that is expected and intentional in this mode."""
+    else:
+        mode_block = """\n=== PLANNING MODE: COMPETITIVE ===
+The student wants to MAXIMIZE UCLA admissions strength.
+- Apply the full Tier 1 → Tier 2 → Tier 3 → Tier 4 priority model.
+- Include Statistics (STAT C1000 or equivalent) and Calculus III as Tier 2 mandatory courses.
+- Include Linear Algebra if units allow.
+- Choose rigorous GE courses that show academic strength.
+- Maximize the Transfer Strength Score."""
+
+    prompt = f"""You are building a complete 4-term UC transfer schedule for a student at {college} transferring to {school} for {major}.{mode_block}
 
 {articulation_section}{igetc_section}
 
