@@ -165,6 +165,38 @@ def reset():
 
 # ── Plan generation ────────────────────────────────────────────────────────
 
+_UC_NAME_MAP = {
+    "ucla":          "los angeles",
+    "uc la":         "los angeles",
+    "los angeles":   "los angeles",
+    "ucb":           "berkeley",
+    "uc berkeley":   "berkeley",
+    "cal":           "berkeley",
+    "berkeley":      "berkeley",
+    "ucsd":          "san diego",
+    "uc san diego":  "san diego",
+    "san diego":     "san diego",
+    "uci":           "irvine",
+    "uc irvine":     "irvine",
+    "irvine":        "irvine",
+    "ucsb":          "santa barbara",
+    "uc santa barbara": "santa barbara",
+    "santa barbara": "santa barbara",
+    "ucd":           "davis",
+    "uc davis":      "davis",
+    "davis":         "davis",
+    "ucsc":          "santa cruz",
+    "uc santa cruz": "santa cruz",
+    "santa cruz":    "santa cruz",
+    "ucr":           "riverside",
+    "uc riverside":  "riverside",
+    "riverside":     "riverside",
+    "ucm":           "merced",
+    "uc merced":     "merced",
+    "merced":        "merced",
+}
+
+
 def _extract_major_prep(college: str, uc: str, major: str) -> str:
     """
     Find the agreement file for college→uc+major, extract the exact CC courses
@@ -177,7 +209,8 @@ def _extract_major_prep(college: str, uc: str, major: str) -> str:
         return ""
 
     college_l = college.lower()
-    uc_l      = uc.lower()
+    # Resolve common UC abbreviations to the canonical index name
+    uc_l = _UC_NAME_MAP.get(uc.lower().strip(), uc.lower())
     major_l   = major.lower()
 
     # Score every agreement file
