@@ -16,14 +16,19 @@ def _load_json_or_gz(base_path):
     return []
 
 
-professors_path = os.path.join(BASE_DIR, "data", "professors.json")
-_professors = _load_json_or_gz(professors_path)
+_professors_path = os.path.join(BASE_DIR, "data", "professors.json")
+_professors_cache = None
 
-# professors.json is a flat list of professor objects
-if isinstance(_professors, dict):
-    # old nested format fallback
-    edges = _professors.get("data", {}).get("newSearch", {}).get("teachers", {}).get("edges", [])
-    _professors = [e["node"] for e in edges if isinstance(e, dict) and "node" in e]
+
+def _get_professors():
+    global _professors_cache
+    if _professors_cache is None:
+        _professors_cache = _load_json_or_gz(_professors_path)
+        # flatten nested format if needed
+        if isinstance(_professors_cache, dict):
+            edges = _professors_cache.get("data", {}).get("newSearch", {}).get("teachers", {}).get("edges", [])
+            _professors_cache = [e["node"] for e in edges if isinstance(e, dict) and "node" in e]
+    return _professors_cache
 
 SUBJECT_KEYWORDS = [
     "english", "biology", "computer", "history", "math", "mathematics",
@@ -35,6 +40,7 @@ SUBJECT_KEYWORDS = [
 
 
 def search_professors(query):
+    _professors = _get_professors()
     q = query.lower()
 
     # Detect subject

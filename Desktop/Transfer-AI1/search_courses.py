@@ -19,11 +19,19 @@ def _load_json_or_gz(base_path):
     return []
 
 
-courses_path = os.path.join(BASE_DIR, "data", "all_transferable_courses.json")
-courses = _load_json_or_gz(courses_path)
+_courses_path = os.path.join(BASE_DIR, "data", "all_transferable_courses.json")
+_courses_cache = None
+
+
+def _get_courses():
+    global _courses_cache
+    if _courses_cache is None:
+        _courses_cache = _load_json_or_gz(_courses_path)
+    return _courses_cache
 
 
 def search_courses(query):
+    courses = _get_courses()
 
     query = query.lower()
 
