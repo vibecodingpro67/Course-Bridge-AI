@@ -888,11 +888,14 @@ For EVERY "UC requires:" entry in the VERIFIED ARTICULATION DATA above:
    A valid plan can be 65–75 units if the major requires it.
 
 ===== STEP 1: ASSEMBLE YOUR COURSE POOL =====
-From Step 0, you now have a concrete list of CC courses. Add IGETC on top:
+ORDERING RULE: Never select GE courses until ALL major prep requirements are fully scheduled.
+GE fills remaining term slots only. Major prep is never trimmed to make room for GE.
 
-A) MAJOR PREP — every course from Step 0's deduplicated list. All Required ones are non-negotiable.
+A) MAJOR PREP FIRST — place every course from Step 0's deduplicated list into terms.
+   Every Tier 1 (Required) course must have a confirmed term slot before any GE is added.
+   Every Tier 2 (Strongly Recommended) course must have a confirmed term slot before GE filler.
 
-B) IGETC — pick exactly ONE course per required area from the IGETC list above:
+B) IGETC — only after all major prep is placed, pick ONE course per required area:
    - Area 1A: first-year English Composition (NOT ESL)
    - Area 1B: Critical Thinking — MUST be an ENGL course if one is listed (check Area 1B list first)
    - Area 2A: Math — if a major prep math course (Calculus) is listed here, use it; don't add a second

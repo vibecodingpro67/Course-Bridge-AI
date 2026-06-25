@@ -439,20 +439,27 @@ Run all checks. If ANY check fails, output "INVALID PLAN — REGENERATING" and f
 
 === COURSE SELECTION PRIORITY MODEL (MAJOR-FIRST) ===
 
+⚠️ ABSOLUTE ORDERING RULE:
+Never select GE courses until ALL major prep requirements are fully scheduled and verified.
+GE fills remaining slots only. Major prep is never trimmed to make room for GE.
+If there is a conflict between fitting a GE course and fitting a required major prep course,
+the major prep course wins. Always.
+
 Tier 1 — REQUIRED (place before anything else):
-- All ASSIST-verified major preparation courses (Micro, Macro, Calc I, Calc II for Economics)
+- All ASSIST-verified major preparation courses
 - English Composition (Area 1A)
-- Any other course explicitly required for admission to the major
+- Any course explicitly required for admission to the major
+- These must ALL be placed in terms before any Tier 3 GE slots are assigned.
 
 Tier 2 — STRONGLY RECOMMENDED MAJOR PREP (place before any GE filler):
-These are NOT electives. They are high-value courses that strengthen the application and
-are expected preparation for upper-division major coursework. Include all that are available.
+These are NOT electives. They are high-value courses expected for upper-division readiness.
+Include all that are available at this CC before filling GE slots.
 - Economics: Statistics (STAT C1000 or equivalent), Calculus III, Linear Algebra
-- Statistics is ALWAYS Tier 2 for Economics — it is never a filler or a GE convenience pick
-- GE area credit Statistics may also earn (e.g. Area 2A) is a bonus, NOT its reason for inclusion
+- Statistics is ALWAYS Tier 2 for Economics — never a GE filler pick
 - A schedule is INVALID if Statistics is omitted while the student has room for it
 
-Tier 3 — IGETC / GE REQUIREMENTS (after Tiers 1 and 2 are placed):
+Tier 3 — IGETC / GE REQUIREMENTS (only after Tiers 1 and 2 are placed):
+Only add GE courses once every Tier 1 and Tier 2 course has a confirmed term slot.
 - Area 1B Critical Thinking, Arts (3A), Humanities (3B)
 - Social Science Area 4 ×3 — verified via ASSIST only, no subject-matter inference
 - Lab sciences (5A, 5B)
