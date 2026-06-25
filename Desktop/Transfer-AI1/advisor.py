@@ -199,11 +199,7 @@ Rules:
 
 
 def ask_advisor_onboarding_stream(conversation_history):
-    history = list(conversation_history)
-    # Groq requires at least one user message after the system prompt
-    if not history or history[0].get("role") != "user":
-        history = [{"role": "user", "content": "Hi, I want to set up my transfer plan."}] + history
-    messages = [{"role": "system", "content": ONBOARDING_PROMPT}] + history
+    messages = [{"role": "system", "content": ONBOARDING_PROMPT}] + list(conversation_history)
     stream = _get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=messages,

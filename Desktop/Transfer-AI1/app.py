@@ -164,9 +164,10 @@ def onboard():
     history = list(data.get("history", []))
     if len(history) > 20:
         history = history[-20:]
-    # Groq requires conversations to start with a user message
-    while history and history[0].get("role") == "assistant":
-        history = history[1:]
+    # Groq requires conversations to start with a user message.
+    # Prepend a synthetic opener to preserve AI context rather than stripping it.
+    if not history or history[0].get("role") == "assistant":
+        history = [{"role": "user", "content": "Hi, I want to set up my transfer plan."}] + history
 
     def generate():
         try:
