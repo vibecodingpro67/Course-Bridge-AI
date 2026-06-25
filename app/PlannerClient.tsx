@@ -975,7 +975,14 @@ export default function PlannerClient() {
   const [result, setResult] = useState<TransferResult | null>(null);
 
   // ── Transfer AI chat ──────────────────────────────────────────
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // ── Wizard onboarding ─────────────────────────────────────────
+  const [wizardStep, setWizardStep] = useState<1|2|3|4>(1);
+  const [wizardCollege, setWizardCollege] = useState("");
+  const [wizardUC, setWizardUC] = useState("");
+  const [wizardMajor, setWizardMajor] = useState("");
+  const [wizardCourses, setWizardCourses] = useState("");
   const [chatMode, setChatMode] = useState<"onboarding" | "advisor">("onboarding");
   const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -1066,13 +1073,24 @@ export default function PlannerClient() {
     }
   }, [streamResponse]);
 
-  // Auto-start onboarding when chat opens for first time
+  // Auto-start chat onboarding only if wizard was skipped and chat re-opened
   useEffect(() => {
-    if (chatOpen && !onboardingStarted.current && chatMessages.length === 0) {
+    if (chatOpen && !onboardingStarted.current && chatMessages.length === 0 && !onboardingDone) {
       onboardingStarted.current = true;
       runOnboardingMessage([]);
     }
-  }, [chatOpen, chatMessages.length, runOnboardingMessage]);
+  }, [chatOpen, chatMessages.length, runOnboardingMessage, onboardingDone]);
+
+  function completeWizard() {
+    if (wizardCollege) setCommunityCollege(wizardCollege);
+    if (wizardUC)      setTargetSchool(wizardUC);
+    if (wizardMajor)   setTargetMajor(wizardMajor);
+    if (wizardCourses) setCompletedCourses(wizardCourses);
+    setOnboardingDone(true);
+    setTimeout(() => {
+      document.querySelector<HTMLButtonElement>("[data-generate-plan]")?.click();
+    }, 300);
+  }
 
   const sendChatMessage = useCallback(async (text?: string) => {
     const message = (text ?? chatInput).trim();
@@ -1660,6 +1678,155 @@ export default function PlannerClient() {
           ASSIST.org, official college catalogs, and a counselor.
         </footer>
       </section>
+
+      {/* ── Step wizard onboarding ───────────────────────────── */}
+      {!onboardingDone && (() => {
+        const UC_OPTIONS = ["UCLA","UC Berkeley","UC San Diego","UC Irvine","UC Santa Barbara","UC Davis","UC Santa Cruz","UC Riverside","UC Merced"];
+        const CC_SUGGESTIONS = ["De Anza College","Mt. SAC","Santa Monica College","Diablo Valley College","City College of SF","Foothill College","Pasadena City College","El Camino College","Irvine Valley College","Los Angeles Valley College","Cerritos College","Grossmont College","Palomar College","Saddleback College"];
+        const MAJOR_SUGGESTIONS = ["Computer Science","Business Administration","Economics","Psychology","Biology","Nursing","Engineering","Political Science","Sociology","Mathematics","English","Data Science","Mechanical Engineering","Electrical Engineering","Chemistry","Kinesiology","Communications","Accounting","Architecture","Film & Media Studies"];
+        const steps = ["College","Target UC","Major","Courses"];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden">
+              {/* Progress bar */}
+              <div className="flex">
+                {steps.map((_, i) => (
+                  <div key={i} className={`h-1 flex-1 transition-all duration-300 ${i < wizardStep ? "bg-[#0b7f46]" : "bg-[#e5e7eb]"}`} />
+                ))}
+              </div>
+              <div className="p-8">
+                {/* Step 1 — College */}
+                {wizardStep === 1 && (
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-[#0b7f46]">Step 1 of 4</p>
+                      <h2 className="mt-1 text-2xl font-bold text-[#303236]">Where do you go to school?</h2>
+                      <p className="mt-1 text-sm text-[#7b818b]">Enter your California community college</p>
+                    </div>
+                    <input
+                      list="cc-list"
+                      value={wizardCollege}
+                      onChange={e => setWizardCollege(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && wizardCollege.trim()) setWizardStep(2); }}
+                      placeholder="e.g. De Anza College"
+                      className="w-full rounded-2xl border border-[#d1c7b8] bg-[#faf8f3] px-4 py-3 text-sm text-[#303236] outline-none transition focus:border-[#0b7f46] focus:ring-4 focus:ring-[#0b7f46]/10"
+                      autoFocus
+                    />
+                    <datalist id="cc-list">
+                      {CC_SUGGESTIONS.map(cc => <option key={cc} value={cc} />)}
+                    </datalist>
+                    <div className="flex flex-wrap gap-2">
+                      {CC_SUGGESTIONS.slice(0,6).map(cc => (
+                        <button key={cc} onClick={() => { setWizardCollege(cc); setWizardStep(2); }}
+                          className="rounded-full border border-[#d8d0c3] bg-[#faf8f3] px-3 py-1 text-xs text-[#4d535c] transition hover:border-[#0b7f46] hover:bg-[#f0faf5] hover:text-[#0b7f46]">
+                          {cc}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <button onClick={() => { setOnboardingDone(true); }} className="text-sm text-[#a2a7af] hover:text-[#7b818b] transition">Skip setup</button>
+                      <button onClick={() => setWizardStep(2)} disabled={!wizardCollege.trim()}
+                        className="rounded-2xl bg-[#0b7f46] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#08683a] disabled:opacity-40">
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Step 2 — Target UC */}
+                {wizardStep === 2 && (
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-[#0b7f46]">Step 2 of 4</p>
+                      <h2 className="mt-1 text-2xl font-bold text-[#303236]">Which UC are you aiming for?</h2>
+                      <p className="mt-1 text-sm text-[#7b818b]">Select your target campus</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {UC_OPTIONS.map(uc => (
+                        <button key={uc} onClick={() => setWizardUC(uc)}
+                          className={`rounded-2xl border px-3 py-3 text-sm font-semibold transition ${wizardUC === uc ? "border-[#0b7f46] bg-[#f0faf5] text-[#0b7f46]" : "border-[#d8d0c3] bg-[#faf8f3] text-[#303236] hover:border-[#0b7f46] hover:text-[#0b7f46]"}`}>
+                          {uc}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <button onClick={() => setWizardStep(1)} className="text-sm text-[#7b818b] transition hover:text-[#303236]">← Back</button>
+                      <button onClick={() => setWizardStep(3)} disabled={!wizardUC}
+                        className="rounded-2xl bg-[#0b7f46] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#08683a] disabled:opacity-40">
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Step 3 — Major */}
+                {wizardStep === 3 && (
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-[#0b7f46]">Step 3 of 4</p>
+                      <h2 className="mt-1 text-2xl font-bold text-[#303236]">What do you want to study?</h2>
+                      <p className="mt-1 text-sm text-[#7b818b]">Enter your intended major</p>
+                    </div>
+                    <input
+                      list="major-list"
+                      value={wizardMajor}
+                      onChange={e => setWizardMajor(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && wizardMajor.trim()) setWizardStep(4); }}
+                      placeholder="e.g. Computer Science"
+                      className="w-full rounded-2xl border border-[#d1c7b8] bg-[#faf8f3] px-4 py-3 text-sm text-[#303236] outline-none transition focus:border-[#0b7f46] focus:ring-4 focus:ring-[#0b7f46]/10"
+                      autoFocus
+                    />
+                    <datalist id="major-list">
+                      {MAJOR_SUGGESTIONS.map(m => <option key={m} value={m} />)}
+                    </datalist>
+                    <div className="flex flex-wrap gap-2">
+                      {MAJOR_SUGGESTIONS.slice(0,8).map(m => (
+                        <button key={m} onClick={() => { setWizardMajor(m); setWizardStep(4); }}
+                          className="rounded-full border border-[#d8d0c3] bg-[#faf8f3] px-3 py-1 text-xs text-[#4d535c] transition hover:border-[#0b7f46] hover:bg-[#f0faf5] hover:text-[#0b7f46]">
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-2">
+                      <button onClick={() => setWizardStep(2)} className="text-sm text-[#7b818b] transition hover:text-[#303236]">← Back</button>
+                      <button onClick={() => setWizardStep(4)} disabled={!wizardMajor.trim()}
+                        className="rounded-2xl bg-[#0b7f46] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#08683a] disabled:opacity-40">
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Step 4 — Courses */}
+                {wizardStep === 4 && (
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-[#0b7f46]">Step 4 of 4</p>
+                      <h2 className="mt-1 text-2xl font-bold text-[#303236]">What courses have you finished?</h2>
+                      <p className="mt-1 text-sm text-[#7b818b]">List them in plain text — don't worry about formatting</p>
+                    </div>
+                    <textarea
+                      value={wizardCourses}
+                      onChange={e => setWizardCourses(e.target.value)}
+                      placeholder="e.g. Calc 1, English 1A, Intro to CS, Econ 1"
+                      rows={4}
+                      className="w-full rounded-2xl border border-[#d1c7b8] bg-[#faf8f3] px-4 py-3 text-sm text-[#303236] outline-none transition focus:border-[#0b7f46] focus:ring-4 focus:ring-[#0b7f46]/10 resize-none"
+                      autoFocus
+                    />
+                    <div className="flex justify-between items-center pt-2">
+                      <button onClick={() => setWizardStep(3)} className="text-sm text-[#7b818b] transition hover:text-[#303236]">← Back</button>
+                      <div className="flex gap-3">
+                        <button onClick={completeWizard} className="text-sm text-[#7b818b] transition hover:text-[#303236]">Skip</button>
+                        <button onClick={completeWizard} disabled={!wizardCourses.trim()}
+                          className="rounded-2xl bg-[#0b7f46] px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#08683a] disabled:opacity-40">
+                          Build My Plan →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Transfer AI floating chat ─────────────────────────── */}
       {!chatOpen && (
