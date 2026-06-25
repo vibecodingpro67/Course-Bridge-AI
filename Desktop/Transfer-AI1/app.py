@@ -236,9 +236,9 @@ def _extract_igetc_courses(college: str) -> str:
         "The schedule MUST include courses covering ALL required IGETC areas below.",
         "Use ONLY courses listed here for IGETC slots — do not invent course numbers.",
         "NOTE: Area 6 (Languages Other Than English) — if no course is listed, the student may satisfy this with 2+ years of the same HS foreign language (C or better). Include a note about this in Key Notes.",
-        "LAB SCIENCE RULE: IGETC requires at least ONE science course (5A or 5B) that includes a lab",
-        "component (Area 5C). Courses marked ★LAB below satisfy both their science area AND the lab",
-        "requirement. You MUST pick at least one ★LAB course for Area 5A or 5B.",
+        "LAB SCIENCE RULE: IGETC requires exactly ONE lab course total (5C). Pick ★LAB for ONE of",
+        "5A or 5B. The other science area should use a non-★LAB course if one is available.",
+        "Do NOT put ★LAB in both 5A and 5B — that wastes an extra lab when only one is required.",
         "",
     ]
 
@@ -263,9 +263,12 @@ def _extract_igetc_courses(college: str) -> str:
         # For Area 1B, prefer ENGL courses — must be listed first so AI picks ENGL over PHIL/COMM
         if area_code == "1B":
             unique.sort(key=lambda c: (0 if c.get("prefix","").upper().startswith("ENGL") else 1))
-        # For Area 5A/5B, sort lab courses first so AI picks them
-        if area_code in ("5A", "5B"):
+        # For 5B: sort ★LAB first so 5C is satisfied by biological science (shorter lab course list)
+        # For 5A: sort non-lab first — 5B ★LAB already covers 5C, so 5A should be a lighter course
+        if area_code == "5B":
             unique.sort(key=lambda c: (0 if (c.get("prefix",""), c.get("number","")) in lab_keys else 1))
+        elif area_code == "5A":
+            unique.sort(key=lambda c: (1 if (c.get("prefix",""), c.get("number","")) in lab_keys else 0))
         sample = unique[:5]
         course_strs = []
         for c in sample:

@@ -380,11 +380,16 @@ Area 1B — Critical Thinking / Composition (REQUIRED):
 - Must come AFTER Area 1A is scheduled
 - If missing or unverified → output: "IGETC AREA 1 INCOMPLETE: 1B MISSING"
 
+SELF-CHECK before finalizing 1B: Look at the Area 1B list in the injected IGETC data.
+Is there ANY course whose prefix starts with ENGL? If yes → that ENGL course is your Area 1B choice.
+Replace any COMM or PHIL course you picked. This check is MANDATORY — run it every time.
+
 INVALID combinations the plan must NEVER produce:
 - A philosophy course replacing English Composition for 1A
 - "Area 1 satisfied by philosophy + writing mix"
 - Any single course counting for both 1A and 1B
 - 1B placed in an earlier term than 1A
+- COMM 9 or PHIL 3 used for 1B when an ENGL course appears in the Area 1B data
 
 === IGETC RULES ===
 Each IGETC area slot is filled by EXACTLY ONE course. Once a course fills a slot, no other
@@ -404,13 +409,16 @@ All 9 slots must be covered by courses actually in the term schedule:
 - Area 3A: Arts — ONE course only
 - Area 3B: Humanities — ONE course only
 - Area 4: exactly 3 Social/Behavioral Science courses — STOP at 3
-- Area 5A: Physical Science — ONE course only; MUST choose one marked ★LAB if available
-- Area 5B: Biological Science — ONE course only; MUST choose one marked ★LAB if available
-- Area 5C: Laboratory Science — NOT a separate course. Satisfied automatically if your chosen 5A or
-  5B course is marked ★LAB. If neither your 5A nor 5B choice has ★LAB, you MUST add a separate
-  lab-only course (e.g. ASTR 15L, ANTH 1L). Always prefer ★LAB options in 5A/5B to avoid adding
-  an extra course. The plan is INVALID if no ★LAB course appears in 5A or 5B (and no lab-only
-  course covers 5C).
+- Area 5A: Physical Science — ONE course only
+- Area 5B: Biological Science — ONE course only
+- Area 5C: Laboratory Science — requires exactly ONE ★LAB course total across 5A and 5B.
+  RULE: Pick ★LAB for ONE of (5A or 5B). The other science area should use a non-lab course
+  if one is available. Do NOT put ★LAB in both 5A and 5B — that is TWO labs when only ONE
+  is required. Example: BIOL 10 ★LAB satisfies 5B + 5C. For 5A, pick a non-lab physical
+  science course (e.g. PHYS 10, ASTR 28) if available.
+  Only exception: if EVERY listed course in both 5A and 5B is ★LAB, then two labs is unavoidable.
+  If neither 5A nor 5B has ★LAB, add a separate lab-only course for 5C.
+  The plan is INVALID only if NO lab course (★LAB or standalone) covers 5C at all.
 - Area 6: Foreign Language. If no course available: "satisfy with 2+ years same HS foreign language (C or better) — verify with counselor"
 A major prep course that also satisfies an IGETC area counts for both — listed once, labeled with both.
 The IGETC checklist may only show ✅ for a course that physically appears in a term above.
@@ -508,7 +516,15 @@ Calculate the score step by step before printing the final number.
 ---
 
 **Validity:** PASS or FAIL (FAIL = required major prep missing or ASSIST violation)
-**UC Transfer Strength Score:** [total]/100 — HARD CAP: if calculated total exceeds 100, report 100.
+
+SCORE CALCULATION RULE — FOLLOW EXACTLY:
+Step 1: Add all bonuses to base 70.
+Step 2: Subtract all penalties.
+Step 3: If the result is greater than 100, SET IT TO 100. Do not print any number above 100.
+Step 4: Print: **UC Transfer Strength Score:** [clamped result]/100
+
+YOU MAY NEVER PRINT A NUMBER ABOVE 100. 108/100, 116/100, 103/100 — ALL FORBIDDEN.
+The maximum possible score is 100. If your math exceeds 100, write 100.
 
 **Score interpretation:**
 - 90–100: 🔥 Highly competitive
