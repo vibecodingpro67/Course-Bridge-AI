@@ -2324,7 +2324,7 @@ STRICT RULES — violating any of these is an error:
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-[#0b7f46] px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-[#08683a] active:scale-95"
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-[#0b7f46] px-5 py-4 text-base font-semibold text-white shadow-xl transition hover:bg-[#08683a] active:scale-95 sm:py-3 sm:text-sm"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -2334,33 +2334,41 @@ STRICT RULES — violating any of these is an error:
       )}
 
       {chatOpen && (
-        <div className={`fixed inset-0 z-50 flex ${onboardingDone ? "items-end justify-end p-4 sm:p-6 pointer-events-none" : "items-center justify-center bg-black/60 p-4"}`}>
-          <div className={`pointer-events-auto flex flex-col rounded-2xl border border-[#d8d0c3] bg-white shadow-2xl ${onboardingDone ? "h-[600px] w-full max-w-md" : "h-[600px] w-full max-w-lg"}`}>
+        <div className={`fixed z-50 flex ${
+          onboardingDone
+            ? "inset-x-0 bottom-0 top-[8vh] sm:inset-auto sm:bottom-6 sm:right-6 sm:top-auto sm:items-end sm:justify-end pointer-events-none"
+            : "inset-0 items-center justify-center bg-black/60 p-4"
+        }`}>
+          <div className={`pointer-events-auto flex flex-col bg-white shadow-2xl ${
+            onboardingDone
+              ? "w-full rounded-t-3xl border border-[#d8d0c3] sm:rounded-2xl sm:w-[460px] sm:h-[680px] h-full"
+              : "w-full max-w-lg rounded-2xl border border-[#d8d0c3] h-[90vh] sm:h-[640px]"
+          }`}>
             {/* Header */}
-            <div className="flex items-center justify-between rounded-t-2xl bg-[#0b7f46] px-4 py-3">
+            <div className="flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl bg-gradient-to-r from-[#0a6e3d] to-[#0d9456] px-5 py-4">
               <div>
-                <p className="font-bold text-white">Transfer AI</p>
+                <p className="text-base font-bold text-white">Transfer AI</p>
                 {communityCollege && targetSchool
-                  ? <p className="text-xs text-white/80">{communityCollege} → {targetSchool}{targetMajor ? ` · ${targetMajor}` : ""}</p>
-                  : <p className="text-xs text-white/80">{onboardingDone ? "Ask me anything" : "Setting up your plan…"}</p>
+                  ? <p className="text-xs text-white/80 mt-0.5">{communityCollege} → {targetSchool}{targetMajor ? ` · ${targetMajor}` : ""}</p>
+                  : <p className="text-xs text-white/80 mt-0.5">{onboardingDone ? "Ask me anything about your transfer" : "Setting up your plan…"}</p>
                 }
               </div>
               {onboardingDone ? (
-                <button onClick={() => setChatOpen(false)} className="rounded-full p-1 text-white/80 transition hover:bg-white/20 hover:text-white">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <button onClick={() => setChatOpen(false)} className="rounded-full p-2 text-white/80 transition hover:bg-white/20 hover:text-white">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               ) : (
-                <button onClick={() => { setOnboardingDone(true); setChatOpen(false); }} className="rounded-full px-3 py-1 text-xs text-white/70 transition hover:bg-white/20 hover:text-white">
+                <button onClick={() => { setOnboardingDone(true); setChatOpen(false); }} className="rounded-full px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/20 hover:text-white">
                   Skip
                 </button>
               )}
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
               {chatMessages.length === 0 && chatLoading && (
                 <div className="flex justify-start">
-                  <div className="rounded-2xl border border-[#d8d0c3] bg-[#faf8f3] px-3 py-2 text-sm text-[#7b818b]">
+                  <div className="rounded-2xl border border-[#d8d0c3] bg-[#faf8f3] px-4 py-3 text-sm text-[#7b818b]">
                     <span className="animate-pulse">Transfer AI is thinking…</span>
                   </div>
                 </div>
@@ -2369,7 +2377,7 @@ STRICT RULES — violating any of these is an error:
                 <div className="flex flex-wrap gap-2 pb-1">
                   {["What should I take next semester?", "How competitive is my GPA?", "Tell me about TAG"].map((q) => (
                     <button key={q} onClick={() => sendChatMessage(q)}
-                      className="rounded-full border border-[#d8d0c3] bg-[#faf8f3] px-3 py-1 text-xs text-[#4d535c] transition hover:border-[#0b7f46] hover:text-[#0b7f46]">
+                      className="rounded-full border border-[#d8d0c3] bg-[#faf8f3] px-3 py-1.5 text-xs text-[#4d535c] transition hover:border-[#0b7f46] hover:text-[#0b7f46]">
                       {q}
                     </button>
                   ))}
@@ -2377,7 +2385,7 @@ STRICT RULES — violating any of these is an error:
               )}
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${
                     msg.role === "user"
                       ? "bg-[#0b7f46] text-white"
                       : "border border-[#d8d0c3] bg-[#faf8f3] text-[#303236]"
@@ -2390,22 +2398,22 @@ STRICT RULES — violating any of these is an error:
             </div>
 
             {/* Input */}
-            <div className="border-t border-[#d8d0c3] p-3">
-              <div className="flex gap-2">
+            <div className="border-t border-[#d8d0c3] p-4">
+              <div className="flex gap-3">
                 <input
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } }}
                   placeholder="Ask about your transfer plan…"
-                  className="flex-1 rounded-xl border border-[#d8d0c3] bg-[#faf8f3] px-3 py-2 text-sm outline-none transition focus:border-[#0b7f46] focus:ring-2 focus:ring-[#0b7f46]/10"
+                  className="flex-1 rounded-2xl border border-[#d8d0c3] bg-[#faf8f3] px-4 py-3 text-base outline-none transition focus:border-[#0b7f46] focus:ring-2 focus:ring-[#0b7f46]/10"
                 />
                 <button
                   onClick={() => sendChatMessage()}
                   disabled={!chatInput.trim() || chatLoading}
-                  className="rounded-xl bg-[#0b7f46] px-3 py-2 text-white transition hover:bg-[#08683a] disabled:opacity-40"
+                  className="rounded-2xl bg-[#0b7f46] px-4 py-3 text-white transition hover:bg-[#08683a] disabled:opacity-40"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
                 </button>
