@@ -1239,16 +1239,18 @@ Already completed courses (DO NOT include these anywhere in the schedule): ${com
 
 Output format — use exactly these headers, nothing before them:
 ## Term 1 (Fall)
-- Course name (units)
+- COURSE# — Full Course Title (X units)
 
 ## Term 2 (Spring)
-- Course name (units)
+- COURSE# — Full Course Title (X units)
 
 ## Term 3 (Fall)
-- Course name (units)
+- COURSE# — Full Course Title (X units)
 
 ## Term 4 (Spring)
-- Course name (units)
+- COURSE# — Full Course Title (X units)
+
+Example of correct format: "MATH 16A — Calculus for Business (4 units)"
 
 ## Key Notes
 - TAG: [eligible or not and why]
