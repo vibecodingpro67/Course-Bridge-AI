@@ -1232,34 +1232,42 @@ export default function PlannerClient() {
   async function generateAIPlan(college: string, school: string, major: string, courses: string) {
     setAiPlanLoading(true);
     setAiPlan("");
-    const coursePart = courses.trim() ? `Courses already completed: ${courses}.` : "No courses completed yet — plan from the beginning.";
-    const message = `Build a semester-by-semester transfer schedule for a student at ${college} planning to transfer to ${school} to study ${major}. ${coursePart}
+    const completedList = courses.trim() ? courses : "none";
+    const message = `You are building a 2-year semester-by-semester transfer schedule for a student at ${college} planning to transfer to ${school} for ${major}.
 
-Format the output exactly like this:
-## Fall Semester 1
-- [Course name or requirement]
-- ...
+Already completed courses (DO NOT include these anywhere in the schedule): ${completedList}
 
-## Spring Semester 1
-- ...
+Output format — use exactly these headers, nothing before them:
+## Term 1 (Fall)
+- Course name (units)
 
-## Fall Semester 2
-- ...
+## Term 2 (Spring)
+- Course name (units)
 
-## Spring Semester 2
-- ...
+## Term 3 (Fall)
+- Course name (units)
+
+## Term 4 (Spring)
+- Course name (units)
 
 ## Key Notes
-- TAG eligibility (if applicable)
-- IGETC recommendation
-- GPA target
+- TAG: [eligible or not and why]
+- IGETC: [complete or partial]
+- GPA target: [number]
 
-IMPORTANT RULES:
-- Do NOT invent course numbers. Only name a specific course number (e.g. MATH 1A) if you have verified articulation data from your ASSIST database for ${college}.
-- If you don't have a specific articulation, describe the requirement instead (e.g. "Calculus I — check ASSIST.org for exact course").
-- Keep each semester to 4–5 courses (15–17 units).
-- Skip any requirements the student already completed.
-- Be concise — no long preambles or introductions.`;
+STRICT RULES — violating any of these is an error:
+
+1. PREREQUISITES: Never place a course and its prerequisite in the same term. If course B requires course A, course A MUST appear in an earlier term. Example: MATH 16A and MATH 16B can NEVER be in the same term — 16A must come first.
+
+2. COMPLETED COURSES: Do not list any course the student already completed. They are done. They do not appear anywhere in the schedule.
+
+3. BALANCE: Each term must have a mix of subject areas — do not stack all math or all econ courses in one term. Spread prerequisites across terms naturally.
+
+4. LOAD: 4–5 courses per term (13–17 units). Do not exceed this.
+
+5. COURSE NUMBERS: Only use a specific course number (e.g. MATH 16A) if you have verified ASSIST articulation data for ${college}. If uncertain, write the requirement name only (e.g. "Microeconomics — verify on ASSIST.org").
+
+6. NO PREAMBLE: Start your response directly with "## Term 1 (Fall)". No greeting, no intro paragraph.`;
     try {
       await streamResponse("/api/chat", [{ role: "user", content: message }], (r) => {
         // Strip the model-switch notice from the displayed output
