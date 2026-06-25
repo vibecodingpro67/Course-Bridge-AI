@@ -1087,16 +1087,20 @@ export default function PlannerClient() {
 
   function completeWizard() {
     const courses = wizardNoCourses ? "" : wizardCourses;
-    if (wizardCollege)      setCommunityCollege(wizardCollege);
-    if (wizardUCs.length)   setTargetSchool(wizardUCs[0]);
-    if (wizardMajor)        setTargetMajor(wizardMajor);
+    if (wizardCollege)    setCommunityCollege(wizardCollege);
+    if (wizardUCs.length) setTargetSchool(wizardUCs[0]);
+    if (wizardMajor)      setTargetMajor(wizardMajor);
     setCompletedCourses(courses);
     setPlanSchools(wizardUCs);
     setActiveSchoolTab(wizardUCs[0] ?? "");
     setOnboardingDone(true);
+    // Scroll to planner first, then trigger plan generation after React has re-rendered
+    setTimeout(() => {
+      document.getElementById("planner")?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
     setTimeout(() => {
       document.querySelector<HTMLButtonElement>("[data-generate-plan]")?.click();
-    }, 300);
+    }, 600);
   }
 
   const sendChatMessage = useCallback(async (text?: string) => {
