@@ -1070,7 +1070,7 @@ function UCStatsPanel({ school }: { school: string }) {
           <p className="text-xs text-[#7b818b] mt-1">{s.tag ? `Min GPA ${s.tagGPA}` : "No TAG offered"}</p>
         </div>
       </div>
-      <p className={`mt-3 text-xs font-semibold ${color}`}>{label} — UC systemwide minimum GPA is 2.4; aim for 3.5+ at selective campuses.</p>
+      <p className={`mt-3 text-xs font-semibold ${color}`}>{label} — Aim for 3.0+ minimum (3.5+ for selective campuses). UC eligibility floor is 2.4 but far from competitive.</p>
     </div>
   );
 }
