@@ -1128,6 +1128,35 @@ export default function PlannerClient() {
   const [showDeadlines, setShowDeadlines] = useState(false);
   const [showTagChecker, setShowTagChecker] = useState(false);
 
+  // ── TAG eligibility checker ───────────────────────────────────
+  type TagCampusResult = {
+    campus: string; eligible: boolean; requiredGPA: number;
+    majorExcluded: boolean; gpaOk: boolean | null;
+    notes: string; tagWebsite?: string; filingPeriod: string;
+  };
+  const [tagGpaInput, setTagGpaInput] = useState("");
+  const [tagMajorInput, setTagMajorInput] = useState("");
+  const [tagResults, setTagResults] = useState<TagCampusResult[] | null>(null);
+  const [tagLoading, setTagLoading] = useState(false);
+  const [tagError, setTagError] = useState("");
+
+  async function checkTagEligibility() {
+    const gpa = parseFloat(tagGpaInput);
+    if (!tagMajorInput.trim()) { setTagError("Please enter your major."); return; }
+    if (isNaN(gpa) || gpa < 1.0 || gpa > 4.0) { setTagError("Enter a valid GPA between 1.0 and 4.0."); return; }
+    setTagError(""); setTagLoading(true); setTagResults(null);
+    try {
+      const res = await fetch("/api/tag-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gpa, major: tagMajorInput.trim() }),
+      });
+      const json = await res.json();
+      if (json.error) { setTagError(json.error); } else { setTagResults(json.results); }
+    } catch { setTagError("Could not reach the server. Try again."); }
+    finally { setTagLoading(false); }
+  }
+
   useEffect(() => {
     if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatOpen]);
@@ -1965,28 +1994,101 @@ export default function PlannerClient() {
                 <span className="text-[#7b818b] text-lg">{showTagChecker ? "−" : "+"}</span>
               </button>
               {showTagChecker && (
-                <div className="px-5 pb-5 space-y-3">
-                  <p className="text-xs text-[#7b818b] leading-5">TAG guarantees admission if you meet the requirements. <strong>UCLA, UC Berkeley, and UCSD do NOT offer TAG.</strong></p>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {Object.entries(UC_STATS).map(([uc, s]) => (
-                      <div key={uc} className={`rounded-xl border p-3 text-center ${s.tag ? "border-green-200 bg-green-50" : "border-[#d8d0c3] bg-[#faf8f3] opacity-60"}`}>
-                        <p className="text-xs font-bold text-[#303236]">{uc.replace("UC ", "UC ")}</p>
-                        {s.tag
-                          ? <><p className="mt-1 text-green-700 text-xs font-semibold">✓ TAG offered</p><p className="text-xs text-[#7b818b]">Min GPA: {s.tagGPA}</p></>
-                          : <p className="mt-1 text-xs text-[#9b1c1c]">✗ No TAG</p>
-                        }
+                <div className="px-5 pb-5 space-y-4">
+                  <p className="text-xs text-[#7b818b] leading-5">
+                    TAG guarantees admission if you meet requirements.{" "}
+                    <strong>UCLA, UC Berkeley, and UCSD do NOT offer TAG.</strong>
+                  </p>
+
+                  {/* Input form */}
+                  <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                    <div>
+                      <label className="text-xs font-semibold text-[#303236] block mb-1">Your GPA</label>
+                      <input
+                        type="number" min="1.0" max="4.0" step="0.01"
+                        placeholder="e.g. 3.6"
+                        value={tagGpaInput}
+                        onChange={e => setTagGpaInput(e.target.value)}
+                        className="w-full rounded-xl border border-[#d1c7b8] bg-white px-3 py-2 text-sm text-[#303236] focus:outline-none focus:ring-2 focus:ring-[#0b7f46]/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-[#303236] block mb-1">Your Major</label>
+                      <input
+                        type="text"
+                        placeholder={targetMajor || "e.g. Economics"}
+                        value={tagMajorInput}
+                        onChange={e => setTagMajorInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") checkTagEligibility(); }}
+                        className="w-full rounded-xl border border-[#d1c7b8] bg-white px-3 py-2 text-sm text-[#303236] focus:outline-none focus:ring-2 focus:ring-[#0b7f46]/30"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={checkTagEligibility}
+                        disabled={tagLoading}
+                        className="rounded-xl bg-[#0b7f46] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#08683a] disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {tagLoading ? "Checking…" : "Check Eligibility"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {tagError && <p className="text-xs text-red-600 font-semibold">{tagError}</p>}
+
+                  {/* Results grid */}
+                  {tagResults && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {tagResults.map(r => (
+                          <div key={r.campus} className={`rounded-xl border p-3 ${
+                            r.eligible
+                              ? "border-green-300 bg-green-50"
+                              : "border-[#f0c5c5] bg-[#fff5f5]"
+                          }`}>
+                            <p className="text-xs font-bold text-[#303236]">{r.campus}</p>
+                            <p className={`mt-1 text-xs font-semibold ${r.eligible ? "text-green-700" : "text-red-600"}`}>
+                              {r.eligible ? "✓ Eligible" : "✗ Not eligible"}
+                            </p>
+                            {r.majorExcluded && (
+                              <p className="mt-0.5 text-xs text-red-500">Major excluded from TAG</p>
+                            )}
+                            {!r.majorExcluded && r.gpaOk === false && (
+                              <p className="mt-0.5 text-xs text-red-500">Need {r.requiredGPA} GPA (you have {tagGpaInput})</p>
+                            )}
+                            {r.eligible && (
+                              <p className="mt-0.5 text-xs text-[#7b818b]">Min GPA: {r.requiredGPA}</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div className="rounded-xl bg-[#faf8f3] border border-[#d8d0c3] p-3">
-                    <p className="text-xs font-bold text-[#303236] mb-1">TAG Requirements (all UCs)</p>
-                    <ul className="text-xs text-[#6f7680] space-y-1 list-disc pl-4">
-                      <li>Complete 60 semester transferable units by end of spring before transfer</li>
-                      <li>Meet the campus minimum TAG GPA (see above)</li>
-                      <li>Complete IGETC or campus GE pattern (varies by campus)</li>
-                      <li>Apply via UC TAG portal: Sept 1–30 each year</li>
-                    </ul>
-                  </div>
+
+                      {/* Eligible campuses next steps */}
+                      {tagResults.some(r => r.eligible) && (
+                        <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+                          <p className="text-xs font-bold text-green-800 mb-1">Next steps for eligible campuses</p>
+                          <ul className="text-xs text-green-700 space-y-0.5 list-disc pl-4">
+                            <li>Submit TAG application via <strong>UC TAP</strong>: September 1–30</li>
+                            <li>Submit UC Application: October 1 – November 30</li>
+                            <li>Major on TAG must exactly match your UC application major</li>
+                            <li>Submit Transfer Academic Update (TAU) by January 31</li>
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Shared requirements reminder */}
+                      <div className="rounded-xl bg-[#faf8f3] border border-[#d8d0c3] p-3">
+                        <p className="text-xs font-bold text-[#303236] mb-1">Universal TAG Requirements</p>
+                        <ul className="text-xs text-[#6f7680] space-y-0.5 list-disc pl-4">
+                          <li>30+ UC-transferable units completed at time of TAG submission</li>
+                          <li>60 semester units by end of spring before transfer</li>
+                          <li>At least one UC-E (English) and one UC-M (Math) completed</li>
+                          <li>No grade below C after submitting TAG</li>
+                          <li>Last school attended must be a California Community College</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
