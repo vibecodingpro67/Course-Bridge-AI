@@ -1706,10 +1706,10 @@ export default function PlannerClient() {
 
         <section
           id="planner"
-          className={`${planSchools.length > 1 ? "mt-4" : "mt-16"} grid gap-6 lg:grid-cols-[0.72fr_1.28fr]`}
+          className={`${planSchools.length > 1 ? "mt-4" : "mt-16"} scroll-mt-4 grid gap-6 lg:grid-cols-[0.72fr_1.28fr] items-start`}
         >
           {/* Left panel: summary after wizard, form before */}
-          <div className="rounded-3xl border border-[#d8d0c3] bg-[#faf8f3] shadow-[0_18px_45px_rgba(67,54,36,0.08)] overflow-hidden">
+          <div className="rounded-3xl border border-[#d8d0c3] bg-[#faf8f3] shadow-[0_18px_45px_rgba(67,54,36,0.08)] overflow-visible">
             {onboardingDone ? (
               <div className="flex flex-col">
                 {/* Green gradient header */}
@@ -1782,7 +1782,7 @@ export default function PlannerClient() {
             )}
           </div>
 
-          <div className="rounded-3xl border border-[#d8d0c3] bg-[#faf8f3] shadow-[0_18px_45px_rgba(67,54,36,0.08)] overflow-hidden">
+          <div className="rounded-3xl border border-[#d8d0c3] bg-[#faf8f3] shadow-[0_18px_45px_rgba(67,54,36,0.08)] overflow-visible">
             {/* AI-generated plan from Flask backend */}
             {(aiPlanLoading || aiPlan) && (
               <div className="print-plan">
