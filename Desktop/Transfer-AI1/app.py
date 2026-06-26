@@ -19,6 +19,11 @@ load_dotenv()
 
 app = Flask(__name__, static_folder="static")
 app.secret_key = os.getenv("FLASK_SECRET", "transfer-ai-change-this-key-xyz")
+app.config.update(
+    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") == "production",
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 init_db()
 
@@ -166,6 +171,69 @@ def chat():
 @app.route("/reset", methods=["POST"])
 def reset():
     return ("", 204)
+
+
+# ── College/UC/Major options (built once from articulations index) ─────────
+
+_OPTIONS_CACHE = None
+
+def _build_options():
+    global _OPTIONS_CACHE
+    if _OPTIONS_CACHE is not None:
+        return _OPTIONS_CACHE
+    import gzip as _gz
+    from collections import defaultdict
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "articulations_index.json")
+    for path in (base + ".gz", base):
+        if not os.path.exists(path):
+            continue
+        opener = _gz.open if path.endswith(".gz") else open
+        with opener(path, "rt", encoding="utf-8") as f:
+            index = json.load(f)
+        break
+    else:
+        _OPTIONS_CACHE = {"colleges": [], "targetsByCollege": {}, "majorsByCollegeAndTarget": {}}
+        return _OPTIONS_CACHE
+
+    targets = defaultdict(set)
+    majors  = defaultdict(lambda: defaultdict(set))
+    for key in index.keys():
+        parts = key.split("__")
+        if len(parts) < 3:
+            continue
+        college = parts[0].replace("_", " ")
+        uc      = parts[1].replace("_", " ")
+        major   = "__".join(parts[2:]).replace("_", " ")
+        targets[college].add(uc)
+        majors[college][uc].add(major)
+
+    _OPTIONS_CACHE = {
+        "colleges": sorted(targets.keys()),
+        "targetsByCollege": {c: sorted(v) for c, v in targets.items()},
+        "majorsByCollegeAndTarget": {c: {u: sorted(v) for u, v in ucs.items()} for c, ucs in majors.items()},
+    }
+    return _OPTIONS_CACHE
+
+
+@app.route("/api/options/colleges")
+def api_options_colleges():
+    opts = _build_options()
+    return jsonify({"colleges": opts["colleges"]})
+
+
+@app.route("/api/options/ucs")
+def api_options_ucs():
+    college = request.args.get("college", "").strip()
+    opts = _build_options()
+    return jsonify({"ucs": opts["targetsByCollege"].get(college, [])})
+
+
+@app.route("/api/options/majors")
+def api_options_majors():
+    college = request.args.get("college", "").strip()
+    uc      = request.args.get("uc", "").strip()
+    opts = _build_options()
+    return jsonify({"majors": opts["majorsByCollegeAndTarget"].get(college, {}).get(uc, [])})
 
 
 # ── Plan generation ────────────────────────────────────────────────────────
@@ -1101,12 +1169,11 @@ def auth_forgot():
     if not email:
         return jsonify({"error": "Enter your email address."}), 400
     token, user = create_reset_token(email)
-    if not token:
-        # Don't reveal whether account exists — return success either way
-        return jsonify({"ok": True, "hint": "If that email has an account, a reset token was generated."})
-    # In production, email the token. Without SMTP, return the token directly
-    # so the user can paste it into the reset form.
-    return jsonify({"ok": True, "token": token, "username": user["username"]})
+    # Always return the same response — don't reveal whether the account exists
+    if token:
+        # Log token server-side for manual delivery until SMTP is configured
+        app.logger.info("Password reset token for %s: %s", email, token)
+    return jsonify({"ok": True, "message": "If an account exists for that email, a reset link has been sent."})
 
 
 @app.route("/auth/reset-password", methods=["POST"])
