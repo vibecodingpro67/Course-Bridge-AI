@@ -277,10 +277,11 @@ _IGETC_REQUIRED = [
 ]
 
 
-def _extract_igetc_courses(college: str) -> str:
+def _extract_igetc_courses(college: str, scheduled_cc_keys: set = None) -> str:
     """
-    Return a block listing 3-5 real IGETC-approved courses per required area
-    for the given community college, so the AI picks actual catalog courses.
+    Return a block listing IGETC-approved courses per required area.
+    If scheduled_cc_keys is provided, areas already covered by major prep
+    are annotated as ALREADY SATISFIED so the LLM does not add a duplicate course.
     """
     data = _load_igetc()
     if not data:
@@ -341,6 +342,25 @@ def _extract_igetc_courses(college: str) -> str:
                         lines.append(f"  • {c.get('prefix','')} {c.get('number','')} - {c.get('title','')} ({c.get('units','?')} units) ★LAB")
                     lines.append("")
             continue
+
+        # Check if a scheduled major prep course already satisfies this IGETC area
+        if scheduled_cc_keys:
+            match = next(
+                (c for c in courses if (c.get("prefix", ""), c.get("number", "")) in scheduled_cc_keys),
+                None
+            )
+            if match:
+                course_label = f"{match.get('prefix','')} {match.get('number','')} - {match.get('title','')}"
+                lines.append(f"Area {area_code} — {area_name}:")
+                lines.append(f"  ✅ ALREADY SATISFIED by {course_label} — already scheduled as [Required Major Prep].")
+                lines.append(f"  This area is MET. Do NOT add a separate course for Area {area_code}.")
+                lines.append("")
+                # Track lab for 5C suppression
+                if area_code in ("5A", "5B"):
+                    mk = (match.get("prefix", ""), match.get("number", ""))
+                    if mk in lab_keys:
+                        lab_already_presented = True
+                continue
 
         seen_nums = set()
         unique = []
@@ -703,7 +723,7 @@ def _extract_major_prep(college: str, uc: str, major: str) -> str:
 
     shard = _load_uc_shard(uc_l)
     if not shard:
-        return ""
+        return "", set()
 
     best_score, best_key = 0.0, None
     for key in shard:
@@ -733,13 +753,14 @@ def _extract_major_prep(college: str, uc: str, major: str) -> str:
                 return _format_arts_block(live_arts, college, uc, major, source="ASSIST.org (live)")
         except Exception:
             pass
-        return ""
+        return "", set()
 
     arts = shard[best_key]
     kparts = best_key.split("__")
     uc_display    = kparts[1].replace("_", " ") if len(kparts) > 1 else uc
     major_display = "__".join(kparts[2:]).replace("_", " ") if len(kparts) > 2 else major
 
+    cc_keys: set = set()
     lines = [
         f"=== PRE-COMPUTED ARTICULATION STATUS: {college} -> {uc_display} | {major_display} ===",
         "Source: ASSIST.org — labels below are computed by the external verification system.",
@@ -760,6 +781,7 @@ def _extract_major_prep(college: str, uc: str, major: str) -> str:
                     continue
                 parts_cc = []
                 for c in grp:
+                    cc_keys.add((c.get("p", ""), c.get("n", "")))
                     parts_cc.append(
                         f"{c.get('p','')} {c.get('n','')} - {c.get('t','')} ({c.get('u','?')} units)"
                     )
@@ -772,11 +794,12 @@ def _extract_major_prep(college: str, uc: str, major: str) -> str:
     lines.append("NOTE: Any UC requirement for this major NOT listed above has no CC articulation")
     lines.append("and is therefore a POST-TRANSFER requirement. Do not invent CC substitutes.")
     lines.append("=== END PRE-COMPUTED ARTICULATION STATUS ===")
-    return "\n".join(lines)
+    return "\n".join(lines), cc_keys
 
 
-def _format_arts_block(arts: list, college: str, uc: str, major: str, source: str = "ASSIST.org") -> str:
-    """Format a list of articulation entries with pre-computed status labels."""
+def _format_arts_block(arts: list, college: str, uc: str, major: str, source: str = "ASSIST.org") -> tuple:
+    """Format articulation entries with pre-computed labels. Returns (block_str, cc_keys_set)."""
+    cc_keys: set = set()
     lines = [
         f"=== PRE-COMPUTED ARTICULATION STATUS: {college} -> {uc} | {major} ===",
         f"Source: {source} — labels are pre-computed by the external verification system.",
@@ -793,10 +816,12 @@ def _format_arts_block(arts: list, college: str, uc: str, major: str, source: st
             for grp in cc_groups:
                 if not grp:
                     continue
-                parts_cc = [
-                    f"{c.get('p','')} {c.get('n','')} - {c.get('t','')} ({c.get('u','?')} units)"
-                    for c in grp
-                ]
+                parts_cc = []
+                for c in grp:
+                    cc_keys.add((c.get("p", ""), c.get("n", "")))
+                    parts_cc.append(
+                        f"{c.get('p','')} {c.get('n','')} - {c.get('t','')} ({c.get('u','?')} units)"
+                    )
                 conj = grp[0].get("j", "Or") if grp else "Or"
                 lines.append(f"  -> Schedule: {f' {conj} '.join(parts_cc)}")
         else:
@@ -804,7 +829,7 @@ def _format_arts_block(arts: list, college: str, uc: str, major: str, source: st
             lines.append(f"  -> No CC articulation. Must be taken at UC after transfer.")
     lines.append("")
     lines.append("=== END PRE-COMPUTED ARTICULATION STATUS ===")
-    return "\n".join(lines)
+    return "\n".join(lines), cc_keys
 
 
 @app.route("/plan", methods=["POST"])
@@ -837,8 +862,8 @@ def plan():
                         headers={"Cache-Control": "no-cache"})
 
     # Pre-extract articulation data and IGETC courses for this CC
-    major_prep_block = _extract_major_prep(college, school, major)
-    igetc_block      = _extract_igetc_courses(college)
+    major_prep_block, scheduled_cc_keys = _extract_major_prep(college, school, major)
+    igetc_block = _extract_igetc_courses(college, scheduled_cc_keys)
     completed_str    = completed if completed else "none"
     honors_rule      = "" if accept_honors else "\n0. HONORS — HIGHEST PRIORITY RULE: The student has DECLINED honors courses. This overrides everything. NEVER include any course whose number ends in 'H' (e.g. ECON 1H, MATH 1AH, ENGL 1AH) or whose title contains 'Honors'. If the only option for a requirement is an honors course, use the non-honors equivalent instead."
 
