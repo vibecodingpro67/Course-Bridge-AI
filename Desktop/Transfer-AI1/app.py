@@ -877,6 +877,59 @@ def _format_arts_block(arts: list, college: str, uc: str, major: str, source: st
     return "\n".join(lines), cc_keys
 
 
+def _validate_plan(plan_text: str, scheduled_cc_keys: set, igetc_block: str) -> list:
+    """
+    Post-generation sanity check. Returns a list of warning strings.
+    Empty list means the plan looks complete. Called after full response is buffered.
+    """
+    warnings = []
+
+    # 1. Truncation guard (also checked inline in generate(), but belt-and-suspenders)
+    if "## Key Notes" not in plan_text:
+        return ["Plan appears truncated — Key Notes section missing. Please regenerate."]
+
+    # 2. IGETC completion: for every area that had real course data, verify ✅ in checklist
+    completion_start = plan_text.find("## IGETC Completion")
+    completion_text = plan_text[completion_start:completion_start + 700] if completion_start != -1 else ""
+    if not completion_text:
+        warnings.append("IGETC Completion section missing from plan.")
+    else:
+        for area_code, area_name, _ in _IGETC_REQUIRED:
+            if area_code in ("5C", "6"):
+                continue  # 5C is covered by lab; Area 6 has HS-language fallback
+            # Only check areas where igetc_block injected real course options
+            area_marker = f"Area {area_code} —"
+            if area_marker not in igetc_block:
+                continue
+            area_igetc_tail = igetc_block.split(area_marker, 1)[1]
+            first_data_line = area_igetc_tail.split("\n")[1] if "\n" in area_igetc_tail else ""
+            if "NO COURSES FOUND" in first_data_line:
+                continue  # already warned in prompt — skip, can't schedule what doesn't exist
+            if "ALREADY SATISFIED" in first_data_line or "COVERED BY MAJOR PREP" in first_data_line:
+                continue  # double-label case: major prep handles this area
+            # Now check that the completion checklist shows ✅ for this area
+            area_label = f"Area {area_code}:"
+            if area_label in completion_text:
+                area_line = completion_text.split(area_label, 1)[1].split("\n")[0]
+                if "✅" not in area_line:
+                    warnings.append(f"IGETC Area {area_code} ({area_name}) not marked ✅ in completion checklist.")
+            else:
+                warnings.append(f"IGETC Area {area_code} ({area_name}) missing from IGETC Completion section.")
+
+    # 3. Coarse major-prep presence check: at least one CC key must appear in the term sections
+    if scheduled_cc_keys:
+        term_end = plan_text.find("## Major Prep Summary")
+        term_text = plan_text[:term_end] if term_end != -1 else plan_text[:3000]
+        found_any = any(f"{p} {n}" in term_text for p, n in scheduled_cc_keys if p and n)
+        if not found_any:
+            warnings.append(
+                "No required major prep courses found in term schedule — "
+                "ASSIST articulation data may have been ignored."
+            )
+
+    return warnings
+
+
 @app.route("/plan", methods=["POST"])
 def plan():
     ip = _get_ip()
@@ -1108,23 +1161,45 @@ Start directly with ## Term 1 (Fall). No preamble.
 - GPA target: {gpa_range} — {gpa_note}"""
 
     def generate():
+        buf = []
+        had_error = False
         try:
             for chunk in ask_plan_stream(prompt):
+                buf.append(chunk)
                 yield f"data: {json.dumps(chunk)}\n\n"
         except Exception as e:
             err_str = str(e).lower()
             if any(kw in err_str for kw in ["rate_limit", "429", "quota", "tokens per", "too large", "413"]):
+                buf.clear()
                 try:
                     for chunk in ask_plan_stream_fallback(prompt):
+                        buf.append(chunk)
                         yield f"data: {json.dumps(chunk)}\n\n"
                 except Exception:
+                    buf.clear()
                     try:
                         for chunk in ask_plan_stream_fallback2(prompt):
+                            buf.append(chunk)
                             yield f"data: {json.dumps(chunk)}\n\n"
                     except Exception:
+                        had_error = True
                         yield f"data: {json.dumps('Something went wrong generating your plan. Please try again.')}\n\n"
             else:
+                had_error = True
                 yield f"data: {json.dumps('Something went wrong generating your plan. Please try again.')}\n\n"
+
+        # Post-generation: truncation check + completeness validation
+        if not had_error and buf:
+            full_text = "".join(buf)
+            if "## Key Notes" not in full_text:
+                trunc_msg = "\n\n⚠️ **Plan appears cut off** — the Key Notes section is missing. Please regenerate."
+                yield f"data: {json.dumps(trunc_msg)}\n\n"
+            else:
+                issues = _validate_plan(full_text, scheduled_cc_keys, igetc_block)
+                if issues:
+                    warning = "\n\n---\n⚠️ **Completeness Warning** — review these items:\n" + "\n".join(f"• {w}" for w in issues)
+                    yield f"data: {json.dumps(warning)}\n\n"
+
         yield "data: [DONE]\n\n"
 
     return Response(
