@@ -490,7 +490,7 @@ def ask_plan_stream(prompt: str):
     stream = _get_client().chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=messages,
-        max_tokens=4096,
+        max_tokens=6000,
         temperature=0.1,
         stream=True,
     )
@@ -528,7 +528,7 @@ def ask_plan_stream_fallback2(prompt: str):
     stream = _get_client().chat.completions.create(
         model="meta-llama/llama-4-scout-17b-16e-instruct",
         messages=messages,
-        max_tokens=4096,
+        max_tokens=6000,
         temperature=0.1,
         stream=True,
     )
