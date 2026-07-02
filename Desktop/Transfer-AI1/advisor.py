@@ -309,18 +309,6 @@ You are NOT allowed to:
 
 If a course or articulation is not in the provided data → it does NOT exist for this plan.
 
-🚨 NO COMPUTATION RULE
-
-You are NOT allowed to compute:
-- scores
-- rankings
-- weights
-- recommendations
-- improvement suggestions
-
-ALL of the above MUST come from external input data only.
-If not explicitly provided in the input → output exactly: NOT PROVIDED
-
 🚨 PASS/FAIL HARD RULE
 
 You are NOT allowed to compute overall status.
@@ -468,18 +456,7 @@ If none → write: None — all UC requirements have CC articulation.
 ## Key Notes
 - TAG: [copy verbatim from user message input — do not change]
 - GPA target: [copy verbatim from user message input — do not change]
-- Warnings: [list every NOT MET, PARTIAL, UNKNOWN, and any missing IGETC area]
-
----
-
-## Transfer Strength Score
-NOT PROVIDED
-
-## Missing Factors
-NOT PROVIDED
-
-## Recommended Improvements
-NOT PROVIDED"""
+- Warnings: [list every NOT MET, PARTIAL, UNKNOWN, and any missing IGETC area]"""
 
 
 def ask_plan_stream(prompt: str):
