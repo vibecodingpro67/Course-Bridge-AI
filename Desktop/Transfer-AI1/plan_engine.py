@@ -952,6 +952,18 @@ def _sanity_check(result: PlanResult):
                 f"Students typically need summer coursework or an extra year at CC."
             )
 
+    # UC 60-unit minimum transferable unit check
+    _UC_MIN_UNITS = 60.0
+    if result.total_units < _UC_MIN_UNITS:
+        shortfall = _UC_MIN_UNITS - result.total_units
+        result.warnings.append(
+            f"UNIT SHORTFALL: This plan totals {result.total_units:.0f} transferable units, "
+            f"which is {shortfall:.0f}u below the UC minimum of 60 semester units required "
+            f"for transfer eligibility. Add {shortfall:.0f}u of transferable electives "
+            f"(e.g., additional GE courses, language courses, or major-adjacent electives) "
+            f"before applying."
+        )
+
     # Under-loaded term check (light GE-only semesters are suspicious)
     for t in range(1, result.active_terms + 1):
         if result.summer_overflow and t == 5:
