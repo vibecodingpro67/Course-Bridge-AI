@@ -20,8 +20,8 @@ Fail criteria (hard errors):
 Soft observations (printed but don't fail the test):
   - EXTENDED PLAN: program needs >4 semesters (expected for heavy programs)
   - Under-loaded term: a term has <9u
-  - UNIT SHORTFALL: plan under 60u (informational; hard-checked only for
-    cases with {"expect_shortfall": True} in their extra dict)
+  - UNIT SHORTFALL: plan under 60 SU (semester) or 90 QU (quarter); hard-checked
+    only for cases with {"expect_shortfall": True} in their extra dict
 
 Case tuple formats:
   (id, desc, college, uc, major, accept_honors)
@@ -52,6 +52,7 @@ from plan_engine import (
     build_render_prompt,
     PlanResult,
     _MAX_UNITS_PER_TERM,
+    _MAX_QUARTER_UNITS_PER_TERM,
 )
 from course_sequence import infer_sequence_order, same_sequence_base
 
@@ -61,13 +62,16 @@ from course_sequence import infer_sequence_order, same_sequence_base
 CASES = [
     # ── Original 9 cases (unchanged) ─────────────────────────────────────────
     (1, "De Anza -> Berkeley -> CS [calc-chain prereq ordering]",
-        "De Anza College", "Berkeley", "Computer Science B.S.", False),
+        "De Anza College", "Berkeley", "Computer Science B.S.", False,
+        {"expect_shortfall": True}),  # 78.5 QU < 90 QU min (quarter school)
     (2, "Foothill -> Berkeley -> CS [ENGL 8 ghost-course]",
-        "Foothill College", "Berkeley", "Computer Science B.S.", False),
+        "Foothill College", "Berkeley", "Computer Science B.S.", False,
+        {"expect_shortfall": True}),  # 71 QU < 90 QU min (quarter school)
     (3, "Foothill -> UCSD -> CS [4 ghost courses]",
         "Foothill College", "UCSD", "Computer Science B.S.", False),
     (4, "De Anza -> Berkeley -> CS [honors consistency]",
-        "De Anza College", "Berkeley", "Computer Science B.S.", False),
+        "De Anza College", "Berkeley", "Computer Science B.S.", False,
+        {"expect_shortfall": True}),  # 78.5 QU < 90 QU min (quarter school)
     (5, "De Anza -> Merced -> Applied Math CS [was 413-trigger]",
         "De Anza College", "Merced",
         "Applied Mathematical Sciences -- Computer Science Emphasis B.S.", False),
@@ -78,9 +82,11 @@ CASES = [
     (8, "De Anza -> UC Davis -> Psychology B.A. [non-CS/Math]",
         "De Anza College", "Davis", "Psychology B.A.", False,
         {"must_include": {"PSYC C1000", "ANTH 1", "PSYC 2"},
-         "min_courses": 10}),
+         "min_courses": 10,
+         "expect_shortfall": True}),  # 68 QU < 90 QU min (quarter school)
     (9, "Foothill -> Merced -> Electrical Engineering [high AND-group]",
-        "Foothill College", "Merced", "Electrical Engineering B.S.", False),
+        "Foothill College", "Merced", "Electrical Engineering B.S.", False,
+        {"expect_shortfall": True}),  # 76 QU < 90 QU min (quarter school)
 
     # ── UCLA coverage (previously zero) ──────────────────────────────────────
     (10, "De Anza -> UCLA -> Psychology B.A. [UCLA non-STEM]",
@@ -111,14 +117,16 @@ CASES = [
          "De Anza College", "Irvine", "Economics B.A.", False,
          {"must_include": {"MATH 1A", "ECON 1", "ECON 2", "MATH 1B"},
           "must_not_include": {"PHTG 1", "PHTG 4", "ARTS 4A"},  # regression: Art major ghost
-          "max_courses": 20}),
+          "max_courses": 20,
+          "expect_shortfall": True}),  # 50.5 QU < 90 QU min (quarter school)
 
     # ── UCSB coverage (previously zero) ──────────────────────────────────────
     (14, "ARC -> UCSB -> Political Science B.A. [UCSB; shortfall expected]",
          "American River College", "Santa Barbara", "Political Science B.A.", False,
          {"expect_shortfall": True}),
-    (15, "De Anza -> UCSB -> Sociology B.A. [UCSB non-STEM]",
-         "De Anza College", "Santa Barbara", "Sociology B.A.", False),
+    (15, "De Anza -> UCSB -> Sociology B.A. [UCSB non-STEM; shortfall expected]",
+         "De Anza College", "Santa Barbara", "Sociology B.A.", False,
+         {"expect_shortfall": True}),  # 44 QU < 90 QU min (quarter school)
 
     # ── UCSC coverage (previously zero) ──────────────────────────────────────
     (16, "ARC -> UCSC -> Psychology B.A. [UCSC; shortfall expected]",
@@ -136,8 +144,9 @@ CASES = [
     # ── UCSD non-CS ───────────────────────────────────────────────────────────
     (19, "ARC -> UCSD -> Psychology B.S. [UCSD non-CS, heavy]",
          "American River College", "San Diego", "Psychology B.S.", False),
-    (20, "De Anza -> UCSD -> Economics B.A. [UCSD non-STEM]",
-         "De Anza College", "San Diego", "Economics B.A.", False),
+    (20, "De Anza -> UCSD -> Economics B.A. [UCSD non-STEM; shortfall expected]",
+         "De Anza College", "San Diego", "Economics B.A.", False,
+         {"expect_shortfall": True}),  # 61 QU < 90 QU min (quarter school)
 
     # ── Merced non-CS ─────────────────────────────────────────────────────────
     (21, "ARC -> Merced -> Sociology B.A. [Merced non-STEM; shortfall expected]",
@@ -145,10 +154,10 @@ CASES = [
          {"expect_shortfall": True}),
 
     # ── Unit-shortfall regression (permanent 60u check tests) ─────────────────
-    (22, "Foothill -> Riverside -> English B.A. [60u shortfall regression ~50.5u]",
+    (22, "Foothill -> Riverside -> English B.A. [shortfall regression ~46.5 QU / ~31 SU]",
          "Foothill College", "Riverside", "English B.A.", False,
          {"expect_shortfall": True}),
-    (23, "De Anza -> Riverside -> Philosophy B.A. [60u shortfall regression ~57u]",
+    (23, "De Anza -> Riverside -> Philosophy B.A. [shortfall regression ~53 QU / ~35 SU]",
          "De Anza College", "Riverside", "Philosophy B.A.", False,
          {"expect_shortfall": True}),
 
@@ -159,19 +168,23 @@ CASES = [
     # ── completedCourses parameter tests ─────────────────────────────────────
     (25, "De Anza -> Berkeley -> CS [completedCourses=MATH 1A,ENGL C1000]",
          "De Anza College", "Berkeley", "Computer Science B.S.", False,
-         {"completed": {"MATH 1A", "ENGL C1000"}}),
+         {"completed": {"MATH 1A", "ENGL C1000"},
+          "expect_shortfall": True}),  # 68.5 QU < 90 QU min (quarter school)
     (26, "De Anza -> Davis -> Psychology B.A. [completedCourses=PSYC 2]",
          "De Anza College", "Davis", "Psychology B.A.", False,
-         {"completed": {"PSYC 2"}}),
+         {"completed": {"PSYC 2"},
+          "expect_shortfall": True}),  # 62 QU < 90 QU min (quarter school)
 
     # ── apCredits parameter test ───────────────────────────────────────────────
     (27, "De Anza -> Berkeley -> CS [apCredits=AP Calculus BC]",
          "De Anza College", "Berkeley", "Computer Science B.S.", False,
-         {"ap_credits": "AP Calculus BC"}),
+         {"ap_credits": "AP Calculus BC",
+          "expect_shortfall": True}),  # 78.5 QU < 90 QU min (quarter school)
 
     # ── Davis additional non-STEM coverage ───────────────────────────────────
-    (28, "De Anza -> Davis -> Sociology B.A. [Davis non-STEM breadth]",
-         "De Anza College", "Davis", "Sociology B.A.", False),
+    (28, "De Anza -> Davis -> Sociology B.A. [Davis non-STEM breadth; shortfall expected]",
+         "De Anza College", "Davis", "Sociology B.A.", False,
+         {"expect_shortfall": True}),  # 61 QU < 90 QU min (quarter school)
 ]
 
 TAG_NOTES = {
@@ -252,12 +265,13 @@ def check_and_groups(result: PlanResult) -> list:
 
 
 def check_unit_overload(result: PlanResult) -> list:
+    cap = _MAX_QUARTER_UNITS_PER_TERM if result.is_quarter else _MAX_UNITS_PER_TERM
     errors = []
     for t in range(1, result.active_terms + 1):
         units = sum(s.units for s in result.terms.get(t, []))
-        if units > _MAX_UNITS_PER_TERM + 0.5:  # 0.5 tolerance for rounding
+        if units > cap + 0.5:  # 0.5 tolerance for rounding
             errors.append(
-                f"Term {t} has {units:.1f}u -- exceeds {_MAX_UNITS_PER_TERM}u hard cap"
+                f"Term {t} has {units:.1f}u -- exceeds {cap}u hard cap"
             )
     return errors
 

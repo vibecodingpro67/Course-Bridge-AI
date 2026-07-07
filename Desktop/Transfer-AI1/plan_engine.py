@@ -93,6 +93,12 @@ _IGETC_REQUIRED = [
     ("6",  "Languages Other Than English",             1),
 ]
 
+# Quarter-system schools (termType=1 in ASSIST; 3 out of 116 CCCs)
+_QUARTER_SCHOOLS = {"De Anza College", "Foothill College", "Lake Tahoe Community College"}
+
+def _is_quarter(college: str) -> bool:
+    return college in _QUARTER_SCHOOLS
+
 _ART_SHARDS: dict = {}
 _IGETC_CACHE = None
 _DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -176,9 +182,10 @@ class PlanResult:
     warnings: list = field(default_factory=list)
     total_units: float = 0.0
     active_terms: int = 4      # how many terms actually have courses
-    extended_plan: bool = False  # True when courses spill past term 4
-    summer_overflow: bool = False  # True when T5 is <10u (recommend as summer session, not extra year)
+    extended_plan: bool = False  # True when courses spill past base term count
+    summer_overflow: bool = False  # True when overflow term is light (<10u)
     multi_track: bool = False  # True when agreement has duplicate OR-menus (emphasis tracks detected)
+    is_quarter: bool = False   # True for De Anza, Foothill, Lake Tahoe
 
     def all_courses(self) -> list:
         out = []
@@ -189,8 +196,9 @@ class PlanResult:
 
 # ── Term naming ───────────────────────────────────────────────────────────────
 
-_MAX_TERMS_HARD = 8      # absolute ceiling — even the heaviest programs top out here
-_MAX_UNITS_PER_TERM = 20.0    # hard cap per term — never create a 25u term
+_MAX_TERMS_HARD = 8            # absolute ceiling
+_MAX_UNITS_PER_TERM = 20.0    # hard cap per semester term
+_MAX_QUARTER_UNITS_PER_TERM = 18.0  # hard cap per quarter term (De Anza/Foothill norm)
 
 _TERMS_PER_YEAR = {
     1: "Fall",
@@ -201,6 +209,18 @@ _TERMS_PER_YEAR = {
     6: "Extended / Semester 6",
     7: "Extended / Semester 7",
     8: "Extended / Semester 8",
+}
+
+# Quarter schools run 3 terms/year (Fall/Winter/Spring); base plan = 6 quarters (2 years)
+_TERMS_QUARTER = {
+    1: "Fall Q1",
+    2: "Winter Q1",
+    3: "Spring Q1",
+    4: "Fall Q2",
+    5: "Winter Q2",
+    6: "Spring Q2",
+    7: "Extended / Quarter 7",
+    8: "Extended / Quarter 8",
 }
 
 
@@ -782,21 +802,23 @@ def _assign_terms(
     major_courses: list,
     igetc_courses: list,
     major: str,
+    is_quarter: bool = False,
 ) -> tuple[dict, dict]:
     """
-    Greedy term bin-packing with prereq constraints and 20u/term hard cap.
+    Greedy term bin-packing with prereq constraints.
 
-    Number of terms is computed from total unit load so no term ever exceeds
-    the cap: max_terms = ceil(total_units / 20), capped at _MAX_TERMS_HARD.
+    Quarter schools use 18 QU/term cap and a 6-term minimum (Fall/Winter/Spring × 2 years).
+    Semester schools use 20 SU/term cap and a 4-term minimum.
     Returns: (terms_dict, term_units_dict)
     """
     import math
 
-    max_units = _MAX_UNITS_PER_TERM
+    max_units  = _MAX_QUARTER_UNITS_PER_TERM if is_quarter else _MAX_UNITS_PER_TERM
+    base_terms = 6 if is_quarter else 4
 
     # Pre-calculate needed terms from total unit load so the cap is never breached
     total_u   = sum(s.units for s in major_courses + igetc_courses)
-    max_terms = max(4, min(math.ceil(total_u / max_units), _MAX_TERMS_HARD))
+    max_terms = max(base_terms, min(math.ceil(total_u / max_units), _MAX_TERMS_HARD))
 
     terms: dict      = {t: []   for t in range(1, max_terms + 1)}
     term_units: dict = {t: 0.0  for t in range(1, max_terms + 1)}
@@ -1081,16 +1103,18 @@ def build_plan(
             r.warnings.append(f"No articulation data found for {college} -> {uc} | {major}")
             return r
 
-    result.terms, _ = _assign_terms(major_courses, igetc_courses, major)
+    result.is_quarter = _is_quarter(college)
+    result.terms, _ = _assign_terms(major_courses, igetc_courses, major, is_quarter=result.is_quarter)
 
     # Compute how many terms have courses
-    last_used = 4
+    base_terms = 6 if result.is_quarter else 4
+    last_used = base_terms
     for t in range(_MAX_TERMS_HARD, 0, -1):
         if result.terms.get(t):
             last_used = t
             break
     result.active_terms  = last_used
-    result.extended_plan = last_used > 4
+    result.extended_plan = last_used > base_terms
 
     _apply_double_labels(result)
 
@@ -1128,46 +1152,74 @@ def _sanity_check(result: PlanResult):
                 )
 
     # Extended plan warning
+    base_terms    = 6 if result.is_quarter else 4
+    overflow_term = base_terms + 1
     if result.extended_plan:
-        t5_units = sum(s.units for s in result.terms.get(5, []))
-        overflow_light = result.active_terms == 5 and t5_units < 10.0
+        ov_units = sum(s.units for s in result.terms.get(overflow_term, []))
+        overflow_light = result.active_terms == overflow_term and ov_units < 10.0
         result.summer_overflow = overflow_light
         if overflow_light:
-            t5_slots = result.terms.get(5, [])
-            courses_str = ", ".join(s.code for s in t5_slots)
-            if len(t5_slots) == 1:
-                tail = "Most transfer students handle this as a single summer course between Year 1 and Year 2."
+            ov_slots = result.terms.get(overflow_term, [])
+            courses_str = ", ".join(s.code for s in ov_slots)
+            if len(ov_slots) == 1:
+                tail = "Most transfer students handle this as a single summer course."
             else:
-                tail = "Most transfer students handle these as summer courses between Year 1 and Year 2."
+                tail = "Most transfer students handle these as summer courses."
+            if result.is_quarter:
+                result.warnings.append(
+                    f"SUMMER SESSION: This plan fits in 6 regular quarters plus one summer session "
+                    f"({courses_str}, {ov_units:.0f}u). {tail}"
+                )
+            else:
+                result.warnings.append(
+                    f"SUMMER SESSION: This plan fits in 4 regular semesters plus one summer session "
+                    f"({courses_str}, {ov_units:.0f}u). {tail}"
+                )
+        else:
+            extra = result.active_terms - base_terms
+            if result.is_quarter:
+                result.warnings.append(
+                    f"EXTENDED PLAN: {result.major} at {result.uc} requires "
+                    f"{result.active_terms} quarters of preparation ({extra} beyond the standard "
+                    f"6-quarter / 2-year timeline). This program is unusually heavy. "
+                    f"Students typically need additional summer coursework."
+                )
+            else:
+                result.warnings.append(
+                    f"EXTENDED PLAN: {result.major} at {result.uc} requires "
+                    f"{result.active_terms} semesters of preparation ({extra} beyond the standard "
+                    f"4-semester / 2-year timeline). This program is unusually heavy. "
+                    f"Students typically need summer coursework or an extra year at CC."
+                )
+
+    # UC unit minimum check: 60 semester units = 90 quarter units
+    _UC_MIN_UNITS = 90.0 if result.is_quarter else 60.0
+    if result.total_units < _UC_MIN_UNITS:
+        if result.is_quarter:
+            sem_equiv   = result.total_units * (2.0 / 3.0)
+            shortfall_qu = _UC_MIN_UNITS - result.total_units
+            shortfall_su = 60.0 - sem_equiv
             result.warnings.append(
-                f"SUMMER SESSION: This plan fits in 4 regular semesters plus one summer session "
-                f"({courses_str}, {t5_units:.0f}u). {tail}"
+                f"UNIT SHORTFALL: This plan totals {result.total_units:.1f} quarter units "
+                f"(approx. {sem_equiv:.1f} semester units), which is {shortfall_qu:.1f} QU "
+                f"({shortfall_su:.1f} SU) below the UC minimum of 90 quarter units "
+                f"(= 60 semester units) required for transfer eligibility. "
+                f"Add {shortfall_qu:.1f} QU of transferable electives before applying."
             )
         else:
-            extra = result.active_terms - 4
+            shortfall = _UC_MIN_UNITS - result.total_units
             result.warnings.append(
-                f"EXTENDED PLAN: {result.major} at {result.uc} requires "
-                f"{result.active_terms} semesters of preparation ({extra} beyond the standard "
-                f"4-semester / 2-year timeline). This program is unusually heavy. "
-                f"Students typically need summer coursework or an extra year at CC."
+                f"UNIT SHORTFALL: This plan totals {result.total_units:.1f} transferable units, "
+                f"which is {shortfall:.1f}u below the UC minimum of 60 semester units required "
+                f"for transfer eligibility. Add {shortfall:.1f}u of transferable electives "
+                f"(e.g., additional GE courses, language courses, or major-adjacent electives) "
+                f"before applying."
             )
 
-    # UC 60-unit minimum transferable unit check
-    _UC_MIN_UNITS = 60.0
-    if result.total_units < _UC_MIN_UNITS:
-        shortfall = _UC_MIN_UNITS - result.total_units
-        result.warnings.append(
-            f"UNIT SHORTFALL: This plan totals {result.total_units:.1f} transferable units, "
-            f"which is {shortfall:.1f}u below the UC minimum of 60 semester units required "
-            f"for transfer eligibility. Add {shortfall:.1f}u of transferable electives "
-            f"(e.g., additional GE courses, language courses, or major-adjacent electives) "
-            f"before applying."
-        )
-
-    # Under-loaded term check (light GE-only semesters are suspicious)
+    # Under-loaded term check
     for t in range(1, result.active_terms + 1):
-        if result.summer_overflow and t == 5:
-            continue  # summer session can legitimately be 1-2 courses
+        if result.summer_overflow and t == overflow_term:
+            continue  # summer session can legitimately be light
         units = sum(s.units for s in result.terms.get(t, []))
         if units > 0 and units < 9.0:
             result.warnings.append(
@@ -1202,38 +1254,49 @@ def build_render_prompt(
             "the total course load.'\n"
         )
 
+    base_terms    = 6 if result.is_quarter else 4
+    overflow_term = base_terms + 1
+    term_names    = _TERMS_QUARTER if result.is_quarter else _TERMS_PER_YEAR
+    term_word     = "quarters" if result.is_quarter else "semesters"
+    std_timeline  = "6-quarter / 2-year" if result.is_quarter else "4-semester / 2-year"
+
     if result.extended_plan and not result.summer_overflow:
-        extra = result.active_terms - 4
+        extra = result.active_terms - base_terms
         lines.append(
-            f"WARNING: This is an EXTENDED PLAN requiring {result.active_terms} semesters "
-            f"({extra} beyond the standard 4). Terms 5+ represent additional semesters. "
-            "Include a prominent note in Key Notes that this program requires more than "
-            "the standard 2-year CC timeline and students should plan for summer sessions "
-            "or a 3rd year at CC.\n"
+            f"WARNING: This is an EXTENDED PLAN requiring {result.active_terms} {term_word} "
+            f"({extra} beyond the standard {std_timeline}). Terms {overflow_term}+ represent "
+            f"additional {term_word}. Include a prominent note in Key Notes that this program "
+            "requires more than the standard 2-year CC timeline and students should plan for "
+            "summer sessions or additional terms at CC.\n"
         )
     elif result.summer_overflow:
-        t5_slots = result.terms.get(5, [])
-        t5_units = sum(s.units for s in t5_slots)
-        courses_str = ", ".join(s.code for s in t5_slots)
-        if len(t5_slots) == 1:
+        ov_slots = result.terms.get(overflow_term, [])
+        ov_units = sum(s.units for s in ov_slots)
+        courses_str = ", ".join(s.code for s in ov_slots)
+        if len(ov_slots) == 1:
             summer_tail = (
                 "the summer course is optional-but-recommended and most students complete it "
-                "between Year 1 and Year 2 without extending their timeline."
+                "without extending their timeline."
             )
         else:
             summer_tail = (
                 "the summer session courses are optional-but-recommended and most students "
-                "complete them between Year 1 and Year 2 without extending their timeline."
+                "complete them without extending their timeline."
             )
+        std_count = "6 regular quarters" if result.is_quarter else "4 regular semesters"
         lines.append(
-            f"NOTE: Term 5 is a lightweight summer session ({courses_str}, {t5_units:.0f}u) — "
-            "NOT a full extra semester. Label Term 5 as 'Summer Session' in the schedule header. "
-            f"In Key Notes, reassure the student: this plan fits in 4 regular semesters; "
+            f"NOTE: Term {overflow_term} is a lightweight summer session ({courses_str}, {ov_units:.0f}u) — "
+            f"NOT a full extra {'quarter' if result.is_quarter else 'semester'}. "
+            f"Label Term {overflow_term} as 'Summer Session' in the schedule header. "
+            f"In Key Notes, reassure the student: this plan fits in {std_count}; "
             f"{summer_tail}\n"
         )
 
     for t in range(1, result.active_terms + 1):
-        season = "Summer Session" if (result.summer_overflow and t == 5) else _TERMS_PER_YEAR.get(t, f"Term {t}")
+        if result.summer_overflow and t == overflow_term:
+            season = "Summer Session"
+        else:
+            season = term_names.get(t, f"Term {t}")
         t_units = sum(s.units for s in result.terms.get(t, []))
         lines.append(f"## Term {t} ({season}) -- {t_units:.0f} units")
         for slot in result.terms.get(t, []):
@@ -1285,12 +1348,39 @@ def build_render_prompt(
     lines.append("## Key Notes")
     lines.append(f"- TAG: {tag_note}")
     lines.append(f"- GPA target: {gpa_range} -- {gpa_note}")
-    if result.summer_overflow:
-        lines.append(f"- Total units: {result.total_units:.0f} across 4 semesters + 1 summer session")
+    if result.is_quarter:
+        sem_equiv = result.total_units * (2.0 / 3.0)
+        if result.summer_overflow:
+            lines.append(
+                f"- Total units: {result.total_units:.0f} QU (approx. {sem_equiv:.0f} SU) "
+                f"across 6 quarters + 1 summer session"
+            )
+        else:
+            lines.append(
+                f"- Total units: {result.total_units:.0f} quarter units "
+                f"(approx. {sem_equiv:.0f} semester units) across {result.active_terms} quarters"
+            )
     else:
-        lines.append(f"- Total units: {result.total_units:.0f} across {result.active_terms} terms")
+        if result.summer_overflow:
+            lines.append(f"- Total units: {result.total_units:.0f} across 4 semesters + 1 summer session")
+        else:
+            lines.append(f"- Total units: {result.total_units:.0f} across {result.active_terms} terms")
     for w in result.warnings:
         lines.append(f"- NOTE: {w}")
+
+    # Campus guidance notes (not from ASSIST data)
+    if (result.college == "De Anza College"
+            and "berkeley" in result.uc.lower()
+            and "computer science" in result.major.lower()):
+        lines.append(
+            "\n## Campus Guidance Notes (not from ASSIST data)\n"
+            "- CDSS recommends completing CS 61A (Programming & Abstraction) before transfer "
+            "if not already covered by your CC coursework.\n"
+            "- CS 61C (Machine Structures) has no CC articulation; Berkeley's CDSS suggests "
+            "enrolling in CS 61C via UC Berkeley Summer Session.\n"
+            "- Berkeley's College of Computing, Data Science, and Society (CDSS) does NOT "
+            "require IGETC or Cal-GETC for admission."
+        )
 
     return "\n".join(lines)
 
