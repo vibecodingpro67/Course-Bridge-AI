@@ -1229,6 +1229,39 @@ def _sanity_check(result: PlanResult):
 
 # ── Compact rendering prompt ──────────────────────────────────────────────────
 
+def repair_term_headers(text: str, result: PlanResult) -> tuple:
+    """
+    Deterministically fix LLM-scrambled '## Term N (anything)' headers.
+    Compares each rendered header against the engine's assigned label and replaces
+    on mismatch. Returns (repaired_text, n_repairs).
+    """
+    base_terms    = 6 if result.is_quarter else 4
+    overflow_term = base_terms + 1
+    term_names    = _TERMS_QUARTER if result.is_quarter else _TERMS_PER_YEAR
+
+    correct: dict = {}
+    for t in range(1, result.active_terms + 1):
+        if result.summer_overflow and t == overflow_term:
+            correct[t] = "Summer Session"
+        else:
+            correct[t] = term_names.get(t, f"Term {t}")
+
+    repairs = 0
+
+    def _fix(m: re.Match) -> str:
+        nonlocal repairs
+        t = int(m.group(1))
+        found = m.group(2)
+        expected = correct.get(t)
+        if expected is None or found == expected:
+            return m.group(0)
+        repairs += 1
+        return f"## Term {t} ({expected})"
+
+    repaired = re.sub(r"## Term (\d+) \(([^)]*)\)", _fix, text)
+    return repaired, repairs
+
+
 def build_render_prompt(
     result: PlanResult,
     tag_note: str,
@@ -1239,7 +1272,12 @@ def build_render_prompt(
     lines = [
         "Render this pre-computed UC transfer plan into the exact output format "
         "from your system instructions. DO NOT change any course, term, unit count, "
-        "status, or IGETC assignment. Copy all values verbatim.\n",
+        "status, or IGETC assignment. Copy all values verbatim.\n"
+        "CRITICAL — TERM HEADERS: Each '## Term N (LABEL)' section below has a "
+        "pre-assigned label. Copy the label VERBATIM, character for character. "
+        "Do NOT simplify, reorder, paraphrase, or drop the quarter suffix. "
+        "'Fall Q1', 'Winter Q1', 'Spring Q1', 'Fall Q2', 'Winter Q2', 'Spring Q2' "
+        "are distinct labels — do not shorten any to 'Fall', 'Winter', or 'Spring'.\n",
         f"Student: {result.college} -> {result.uc} | {result.major}\n",
     ]
 

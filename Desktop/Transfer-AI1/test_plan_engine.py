@@ -44,12 +44,14 @@ Case tuple formats:
 
 import sys
 import os
+import re
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from plan_engine import (
     build_plan,
     build_render_prompt,
+    repair_term_headers,
     PlanResult,
     _MAX_UNITS_PER_TERM,
     _MAX_QUARTER_UNITS_PER_TERM,
@@ -463,6 +465,81 @@ def run_case(case_id, desc, college, uc, major, accept_honors, extra=None) -> di
 from plan_engine import _UC_NAME_MAP as _UC_NAME_MAP_LOCAL
 
 
+# ── Term header repair test ────────────────────────────────────────────────────
+
+def test_term_header_repair():
+    """Simulate the live scramble (Fall/Spring/Fall/Winter/Spring/Fall) for Case 1
+    (De Anza -> Berkeley -> CS, a quarter school) and assert repair restores the
+    correct Fall Q1/Winter Q1/Spring Q1/Fall Q2/Winter Q2/Spring Q2 sequence."""
+    print(f"\n{'-'*70}")
+    print("TERM HEADER REPAIR TEST: De Anza -> Berkeley -> CS (quarter school)")
+
+    try:
+        result = build_plan("De Anza College", "Berkeley", "Computer Science B.S.",
+                            accept_honors=False)
+    except Exception as e:
+        import traceback
+        print(f"  ERROR building plan: {e}")
+        print(traceback.format_exc()[:500])
+        return {"id": "THR", "desc": "Term header repair", "status": "ERROR",
+                "errors": [str(e)]}
+
+    if not result.is_quarter:
+        errors = ["De Anza College was not detected as a quarter school (is_quarter=False)"]
+        print(f"  FAIL: {errors[0]}")
+        return {"id": "THR", "desc": "Term header repair", "status": "FAIL", "errors": errors}
+
+    # Reproduce the exact scramble observed in the live response:
+    # Correct:  Fall Q1, Winter Q1, Spring Q1, Fall Q2, Winter Q2, Spring Q2
+    # Observed: Fall,    Spring,    Fall,      Winter,  Spring,    Fall
+    wrong_seasons = ["Fall", "Spring", "Fall", "Winter", "Spring", "Fall"]
+    lines = []
+    for t in range(1, result.active_terms + 1):
+        wrong = wrong_seasons[t - 1] if t <= len(wrong_seasons) else f"Term {t}"
+        lines.append(f"## Term {t} ({wrong})")
+        for slot in result.terms.get(t, []):
+            lines.append(f"- {slot.code} -- {slot.title}")
+        lines.append("")
+    lines.append("## Key Notes")
+    lines.append("- Some note")
+    scrambled = "\n".join(lines)
+
+    repaired, n_repairs = repair_term_headers(scrambled, result)
+
+    expected = ["Fall Q1", "Winter Q1", "Spring Q1", "Fall Q2", "Winter Q2", "Spring Q2"]
+    errors = []
+
+    if n_repairs == 0:
+        errors.append("No repairs applied — expected scrambled headers to be corrected")
+
+    # Each expected label must appear in order
+    last_pos = -1
+    for label in expected[:result.active_terms]:
+        pos = repaired.find(f"({label})")
+        if pos == -1:
+            errors.append(f"Expected label '({label})' not found after repair")
+        elif pos <= last_pos:
+            errors.append(f"Label '({label})' appears out of order (pos {pos} <= prev {last_pos})")
+        else:
+            last_pos = pos
+
+    # None of the wrong labels should survive as a standalone header
+    for t, wrong in enumerate(wrong_seasons[:result.active_terms], start=1):
+        if re.search(rf"## Term {t} \({re.escape(wrong)}\)", repaired):
+            errors.append(f"Scrambled label still present: '## Term {t} ({wrong})'")
+
+    if errors:
+        print(f"  FAIL ({len(errors)} errors):")
+        for e in errors:
+            print(f"    * {e}")
+        return {"id": "THR", "desc": "Term header repair", "status": "FAIL", "errors": errors}
+
+    print(f"  Repaired {n_repairs} of {result.active_terms} headers")
+    print(f"  Confirmed: {' -> '.join(expected[:result.active_terms])}")
+    print(f"  PASS")
+    return {"id": "THR", "desc": "Term header repair", "status": "PASS", "errors": []}
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -477,6 +554,9 @@ def main():
         # Pad to 7 elements so run_case always receives extra dict (or None)
         r = run_case(*case) if len(case) == 7 else run_case(*case, None)
         results.append(r)
+
+    # Always run term header repair test regardless of case filter
+    results.append(test_term_header_repair())
 
     print(f"\n{'='*70}")
     print("SUMMARY")

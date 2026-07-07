@@ -8,7 +8,9 @@ from advisor import (
     ask_plan_stream, ask_plan_stream_fallback, ask_plan_stream_fallback2,
     _PLAN_SYSTEM_PROMPT,
 )
-from plan_engine import build_plan as _engine_build_plan, render_plan_stream as _engine_render_stream
+from plan_engine import (build_plan as _engine_build_plan,
+                         render_plan_stream as _engine_render_stream,
+                         repair_term_headers as _engine_repair_term_headers)
 from db import (
     init_db, create_user, get_user_by_email, get_user_by_id,
     verify_password, email_exists, update_profile,
@@ -1555,31 +1557,40 @@ def plan_v2():
         try:
             for chunk in _engine_render_stream(result, tag_note, gpa_range, gpa_note, mode):
                 buf.append(chunk)
-                yield f"data: {json.dumps(chunk)}\n\n"
-            app.logger.info(
-                "plan_v2_ok college=%r school=%r major=%r terms=%d courses=%d est_tokens=%d",
-                college, school, major, result.active_terms, len(result.all_courses()), est_tokens,
-            )
+            # Collect full text before yielding — repair must run first
         except Exception as e:
             app.logger.error(
                 "plan_v2_render_fail college=%r school=%r major=%r err=%.200s",
                 college, school, major, str(e),
             )
             yield f"data: {json.dumps('Something went wrong rendering your plan. Please try again.')}\n\n"
+            yield "data: [DONE]\n\n"
+            return
 
-        # Validation: ghost-course + truncation check on rendered output
-        if buf:
-            full_text = "".join(buf)
-            if "## Key Notes" not in full_text:
-                trunc = "\n\n⚠️ **Plan appears cut off** — Key Notes section missing. Please regenerate."
-                yield f"data: {json.dumps(trunc)}\n\n"
-            elif result.warnings:
-                ghost_warns = [w for w in result.warnings if w.startswith("Ghost:")]
-                if ghost_warns:
-                    warn_text = ("\n\n---\n⚠️ **Completeness Warning:**\n"
-                                 + "\n".join(f"• {w}" for w in ghost_warns))
-                    yield f"data: {json.dumps(warn_text)}\n\n"
+        full_text = "".join(buf)
 
+        # Deterministic term-header repair: fix any LLM-scrambled season labels
+        full_text, n_repairs = _engine_repair_term_headers(full_text, result)
+        if n_repairs:
+            app.logger.warning(
+                "term_header_repair college=%r school=%r major=%r repairs=%d",
+                college, school, major, n_repairs,
+            )
+
+        # Truncation / ghost-course checks
+        if "## Key Notes" not in full_text:
+            full_text += "\n\n⚠️ **Plan appears cut off** — Key Notes section missing. Please regenerate."
+        elif result.warnings:
+            ghost_warns = [w for w in result.warnings if w.startswith("Ghost:")]
+            if ghost_warns:
+                full_text += ("\n\n---\n⚠️ **Completeness Warning:**\n"
+                              + "\n".join(f"• {w}" for w in ghost_warns))
+
+        app.logger.info(
+            "plan_v2_ok college=%r school=%r major=%r terms=%d courses=%d est_tokens=%d",
+            college, school, major, result.active_terms, len(result.all_courses()), est_tokens,
+        )
+        yield f"data: {json.dumps(full_text)}\n\n"
         yield "data: [DONE]\n\n"
 
     return Response(
