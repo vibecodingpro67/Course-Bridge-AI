@@ -12,6 +12,38 @@ body {
   margin: 0;
 }
 
+.cb-shell {
+  background: #fff;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.cb-header {
+  display: flex;
+  height: 73px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 24px;
+}
+
+.cb-brand { display: inline-flex; align-items: center; gap: 10px; color: #0f172a; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; text-decoration: none; }
+.cb-brand em { color: #2563eb; font-style: normal; }
+.cb-brand-mark { display: grid; height: 28px; width: 28px; place-items: center; border-radius: 9px; background: #2563eb; color: white; font-size: 15px; font-weight: 800; }
+.cb-kicker { color: #2563eb; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.cb-progress { height: 5px; width: 120px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.cb-progress span { display: block; height: 100%; border-radius: inherit; background: #2563eb; transition: width .25s ease; }
+.cb-label { display: block; margin-bottom: 9px; color: #334155; font-size: 13px; font-weight: 700; }
+.cb-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 13px; background: #fff; padding: 13px 14px; color: #0f172a; font-size: 15px; outline: none; transition: border-color .2s, box-shadow .2s; }
+.cb-input::placeholder { color: #94a3b8; }
+.cb-input:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,.1); }
+.cb-primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border-radius: 13px; background: #2563eb; padding: 13px 18px; color: white; font-size: 14px; font-weight: 700; transition: background .2s, transform .2s; }
+.cb-primary:hover { background: #1d4ed8; transform: translateY(-1px); }
+.cb-secondary { color: #64748b; font-size: 14px; font-weight: 600; transition: color .2s; }
+.cb-secondary:hover { color: #0f172a; }
+
+@media (min-width: 640px) { .cb-header { padding: 0 40px; } }
+
 @media print {
   body * { visibility: hidden; }
   .print-plan, .print-plan * { visibility: visible; }
