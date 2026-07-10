@@ -358,25 +358,25 @@ _CC_PREREQ_CHAINS: dict = {
     # handles 22A→22B→22C ordering automatically once they're injected.
     ("de anza college", "CIS", "22C"): {
         "inject": [
-            ("CIS", "22A", "Introduction to Programming (Python)", 4.5, []),
+            ("CIS", "22A", "Beginning Programming Methodologies in C++", 4.5, []),
             ("CIS", "22B", "Intermediate Programming Methodologies in C++", 4.5, []),
         ],
         "trigger_prereqs": [],
     },
     ("de anza college", "CIS", "22CH"): {
         "inject": [
-            ("CIS", "22A", "Introduction to Programming (Python)", 4.5, []),
+            ("CIS", "22A", "Beginning Programming Methodologies in C++", 4.5, []),
             ("CIS", "22B", "Intermediate Programming Methodologies in C++", 4.5, []),
         ],
         "trigger_prereqs": [],
     },
-    # De Anza CIS 26B: intro path is CIS 22A (intro Python) → CIS 26A (C programming).
+    # De Anza CIS 26B: intro path is CIS 22A (intro C++) → CIS 26A (C programming).
     # 22A→26A is cross-series (numeric 22 vs 26) so explicit_prereqs required on 26A.
     # 26A→26B is same-series so sequence detection handles it.
     ("de anza college", "CIS", "26B"): {
         "inject": [
-            ("CIS", "22A", "Introduction to Programming (Python)", 4.5, []),
-            ("CIS", "26A", "C Programming Fundamentals", 4.5, ["CIS 22A"]),
+            ("CIS", "22A", "Beginning Programming Methodologies in C++", 4.5, []),
+            ("CIS", "26A", "C as a Second Programming Language", 4.5, ["CIS 22A"]),
         ],
         "trigger_prereqs": [],
     },
@@ -388,9 +388,9 @@ _CC_PREREQ_CHAINS: dict = {
     # double-labels automatically once it's in scheduled_keys — no PHYS 10 needed.
     ("de anza college", "ENGR", "37"): {
         "inject": [
-            ("PHYS", "4A", "Physics for Scientists and Engineers: Mechanics", 5.0, ["MATH 1A"]),
+            ("PHYS", "4A", "Physics for Scientists and Engineers: Mechanics", 6.0, ["MATH 1A"]),
             ("MATH", "1D", "Calculus IV", 5.0, []),
-            ("PHYS", "4B", "Physics for Scientists and Engineers: Electricity and Magnetism", 5.0, []),
+            ("PHYS", "4B", "Physics for Scientists and Engineers: Electricity and Magnetism", 6.0, []),
         ],
         "trigger_prereqs": ["PHYS 4B", "MATH 1D"],
     },
